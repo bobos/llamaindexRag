@@ -1,0 +1,28 @@
+{
+  "scripts": {
+    "clean": "rm -rf lib build; rm -rf public",
+    "build:be": "tsc --pretty",
+    "build:fe": "webpack --progress $*",
+    "build": "npm run build:be; npm run build:fe",
+    "start": "node build/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.1",
+    "lodash": "^4.17.21",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "css-loader": "^7.1.2",
+    "html-webpack-plugin": "^5.6.3",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.7.2",
+    "webpack": "^5.96.1",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.1.0"
+  }
+}

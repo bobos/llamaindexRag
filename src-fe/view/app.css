@@ -1,0 +1,142 @@
+@charset "utf-8";
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+.chatbot-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Component 6: Slider Bar */
+.sidebar {
+  width: 20%;
+  background-color: #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.slider {
+  width: 80%;
+  margin-bottom: 10px;
+}
+
+/* Main Chat Area */
+.chat-container {
+  width: 80%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px;
+}
+
+/* Component 1: Display Area */
+.display-area {
+  flex: 1;
+  background-color: #ffffff;
+  padding: 20px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  overflow-y: auto; /* To make it scrollable if there are many messages */
+}
+
+/* Styling for User and Bot Messages */
+.user-message {
+  text-align: right;
+  color: blue;
+}
+
+.system-prompt {
+  text-align: left;
+  color: rgba(0, 5, 2, 0.824) ;
+  font-size: 16px;
+}
+
+/* Component 4: Input Box */
+.input-form {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.input-box {
+  width: 80%;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+/* Component 5: Submit Button */
+.submit-button {
+  margin-right: 14%;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.submit-button:hover {
+  background-color: #0056b3; 
+}
+
+.icon-background {
+  background-image: url('../../static/icon.png');
+  width: 35px;
+  height: 35px;
+  background-size: cover;
+  border-radius: 50%;
+  border: 2px solid black;
+}
+
+.pop-wrapper{
+  position: relative;
+}
+
+.message-line{
+  position: relative;
+}
+
+.text-right{
+  text-align: right;
+}
+
+.text-center {
+  margin-left: 25%;
+  text-align: center;
+  background-color: #81de91;
+  color: #333;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 20px;
+  display: inline-block;
+  box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+  max-width: 40%;
+}
+
+.assistant-text-area {
+  max-width: 60%;
+}
+
+.text-area {
+  background-color: #f5f5f5;
+  color: #333;
+  padding: 10px 20px;
+  border-radius: 20px;
+  font-size: 16px;
+  display: inline-block;
+  box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+  max-width: 60%
+}

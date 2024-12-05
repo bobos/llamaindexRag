@@ -1,0 +1,14 @@
+{
+	"compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "es2017"],
+    "jsx": "react",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "./public/",
+    "newLine": "LF"
+  },
+  "include": ["src-fe/**/*"]
+}

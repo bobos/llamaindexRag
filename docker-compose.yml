@@ -1,0 +1,13 @@
+version: "3"
+services:
+  target:
+    ports:
+      - 9100:8080
+    volumes:
+      - ${PWD}:/project
+    working_dir: /project
+    entrypoint: ["/project/init.sh"]
+    command: ["/bin/bash"]
+    hostname: example
+    image: docker.io/node:18.17.0
+    depends_on: []
