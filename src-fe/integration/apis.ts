@@ -10,13 +10,12 @@ export interface Message {
 }
 
 export interface ChatRequest {
-  systemPrompt: string;
-  historyMessages: Message[];
-  message: Message;
+  buy: boolean;
+  messages: Message[];
 }
 
 export async function chat(request: ChatRequest): Promise<Message> {
-  const response = await fetch('/chat', {
+  const response = await fetch('/ask', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json', // Send as JSON

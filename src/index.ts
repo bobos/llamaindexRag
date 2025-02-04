@@ -1,6 +1,7 @@
 import * as http from 'http';
 import * as path from 'path';
 import express from 'express'; 
+import { ask } from './reasoner';
 
 console.log('start express server');
 
@@ -17,10 +18,11 @@ process.on('SIGTERM', () => {
 const app = express();
 app.use(express.json());
 app.use(express.static('public'));
-app.post('/chat', async (req: express.Request, res: express.Response) => {
+app.post('/ask', async (req: express.Request, res: express.Response) => {
   try {
     console.log('receive request', req.body);
-    res.status(200).json({content: 'example response', role: 'assistant'});
+    let response = await ask(req.body);
+    res.status(200).json(response);
   } catch (e) {
     res.status(500).json(JSON.stringify(e))
   }

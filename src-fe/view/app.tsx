@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import './app.css';
 import * as Apis from '../integration/apis';
 
-const defaultPrompt = 'You are a helpful assistant, organize the answer in HTML.' ;
+const defaultPrompt = "你是一个经验丰富的A股资深游资, 帮助用户回答A股各种投资问题";
 let thinking = false;
 const ChatBot: React.FC = () => {
   const [userInput, setUserInput] = useState('');
-  const [systemPrompt, setSystemPrompt] = useState(defaultPrompt) ;
-  const [parameters, setParameters] = useState({temperature: 0, top_p: 1, max_tokens: 1024}); // Initial parameters
+  const [systemPrompt, setSystemPrompt] = useState(defaultPrompt);
+  const [parameters, setParameters] = useState({ temperature: 0, top_p: 1, max_tokens: 1024 }); // Initial parameters
   const [chatHistory, setchatHistory] = useState<Apis.Message[]>(
-    [{role: Apis.Role.Assistant, content: 'Hello! How can I help you today?' }]
-  ) ;
+    []
+  );
 
   // Event handler for form submission
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -18,21 +18,24 @@ const ChatBot: React.FC = () => {
 
     if (!userInput.trim()) return; // Do nothing if input is empty
     // build chat request
-    const userMessage = {role: Apis.Role.User, content: userInput};
+    const userMessage = { role: Apis.Role.User, content: userInput };
     const reqBody: Apis.ChatRequest = {
-      systemPrompt,
-      historyMessages: chatHistory,
-      message: userMessage,
+      buy: true,
+      messages:
+        [{ role: Apis.Role.System, content: systemPrompt },
+        ...chatHistory,
+          userMessage,
+        ]
     }
 
-    setchatHistory((prev) => [... prev, userMessage]);
+    setchatHistory((prev) => [...prev, userMessage]);
     // Clear the user input
     setUserInput('');
     thinking = true;
     Apis.chat(reqBody).then((botMessage: Apis.Message) => {
       thinking = false;
       setchatHistory((prev) => [...prev, botMessage]);
-    }, (e: any) => {alert(JSON.stringify(e))})
+    }, (e: any) => { alert(JSON.stringify(e)) })
   };
 
   const handlePrompt = (e: React.FormEvent<HTMLFormElement>) => {
@@ -43,17 +46,17 @@ const ChatBot: React.FC = () => {
   return (
     <div className="chatbot-container">
       <div className="sidebar">
-        <div className="system-prompt" style={{textAlign: 'left'}}>
-        System prompt:
+        <div className="system-prompt" style={{ textAlign: 'left' }}>
+          System prompt:
         </div>
 
         <form onSubmit={handlePrompt} className="input-form">
-        <textarea
-          value={systemPrompt}
-          onChange={(e) => setSystemPrompt(e.target.value)}
-          placeholder={defaultPrompt}
-          rows={10}
-          cols={150} />
+          <textarea
+            value={systemPrompt}
+            onChange={(e) => setSystemPrompt(e.target.value)}
+            placeholder={defaultPrompt}
+            rows={10}
+            cols={150} />
         </form>
       </div>
 
@@ -68,13 +71,15 @@ const ChatBot: React.FC = () => {
               {message.role === Apis.Role.Assistant ?
                 <div className="message-line">
                   <div className="icon-background" />
-                    <div className="assistant-text-area" style={{textAlign: 'left'}} dangerouslySetInnerHTML={{ __html: message.content }} />
-                  </div>:
-                  <div className="message-line text-right">
-                    <div className="text-area">
-                      {message.content}
-                    </div>
+                  <div className="assistant-text-area" style={{ textAlign: 'left' }}>
+                    {message.content}
                   </div>
+                </div> :
+                <div className="message-line text-right">
+                  <div className="text-area">
+                    {message.content}
+                  </div>
+                </div>
               }
             </div>
           ))}
