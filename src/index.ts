@@ -22,8 +22,9 @@ app.post('/ask', async (req: express.Request, res: express.Response) => {
   try {
     console.log('receive request', req.body);
     let response = await ask(req.body);
-    res.status(200).json(response);
+    res.status(200).json({result: response});
   } catch (e) {
+    console.error('异常', e);
     res.status(500).json(JSON.stringify(e))
   }
 });

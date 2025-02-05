@@ -11,10 +11,11 @@ export interface Message {
 
 export interface ChatRequest {
   buy: boolean;
-  messages: Message[];
+  systemPrompt: string;
+  tsCode: string;
 }
 
-export async function chat(request: ChatRequest): Promise<Message> {
+export async function chat(request: ChatRequest): Promise<string> {
   const response = await fetch('/ask', {
     method: 'POST',
     headers: {
@@ -22,12 +23,11 @@ export async function chat(request: ChatRequest): Promise<Message> {
     },
     body: JSON.stringify(request)
   });
-
-  if (!response.ok)
-    throw new Error(`Network response was not ok: ${response.statusText}`);
+  let rsp = await response.json();
+  console.log(rsp);
 
   try {
-    return await response.json();
+    return rsp.result;
   } catch (e) {
     throw e;
   }

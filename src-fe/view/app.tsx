@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import './app.css';
 import * as Apis from '../integration/apis';
 
-const defaultPrompt = "你是一个经验丰富的A股资深游资, 帮助用户回答A股各种投资问题";
+const defaultPrompt = "你是一个经验丰富的A股资深游资, 帮助用户提供谨慎的A股投资建议";
 let thinking = false;
 const ChatBot: React.FC = () => {
   const [userInput, setUserInput] = useState('');
@@ -18,23 +18,20 @@ const ChatBot: React.FC = () => {
 
     if (!userInput.trim()) return; // Do nothing if input is empty
     // build chat request
-    const userMessage = { role: Apis.Role.User, content: userInput };
+    const userMessage = { role: Apis.Role.User, content: `股票代码: ${userInput}` };
     const reqBody: Apis.ChatRequest = {
       buy: true,
-      messages:
-        [{ role: Apis.Role.System, content: systemPrompt },
-        ...chatHistory,
-          userMessage,
-        ]
+      systemPrompt,
+      tsCode: userInput,
     }
 
     setchatHistory((prev) => [...prev, userMessage]);
     // Clear the user input
     setUserInput('');
     thinking = true;
-    Apis.chat(reqBody).then((botMessage: Apis.Message) => {
+    Apis.chat(reqBody).then((botMessage: string) => {
       thinking = false;
-      setchatHistory((prev) => [...prev, botMessage]);
+      setchatHistory((prev) => [...prev, {role: Apis.Role.Assistant, content: botMessage}]);
     }, (e: any) => { alert(JSON.stringify(e)) })
   };
 
