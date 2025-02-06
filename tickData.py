@@ -17,26 +17,25 @@ try:
     csv_line = ''
     filename = f"{ts_code}_tick.txt"
     for _, row in df.iterrows():
-        tickType = row['TYPE']
-        if tickType == '买盘':
-          tickType = 'B'
-        elif tickType == '卖盘':
-          tickType = 'S'
-        else:
-          tickType = 'N'
+      tickType = row['TYPE']
+      if tickType == '买盘':
+        tickType = 'B'
+      elif tickType == '卖盘':
+        tickType = 'S'
+      else:
+        tickType = 'N'
 
-        time_str = row['TIME']
-        hour_part = time_str.split(':', 1)[0]
-        hour = int(hour_part)
-        if hour >= 14:
-          # 处理时间字符串
-          if time_str.startswith('14:'):
-            new_time = time_str[3:]  # 移除"14:"前缀
-          else:
-            new_time = time_str
-      
+      time_str = row['TIME']
+      hour_part = time_str.split(':', 1)[0]
+      hour = int(hour_part)
+      if hour >= 14:
+        # 处理时间字符串
+        if time_str.startswith('14:'):
+          new_time = time_str[3:]  # 移除"14:"前缀
+        else:
+          new_time = time_str
         # 提取时间价格数据
-        csv_line = f"{csv_line}\n{new_time},{row['PRICE']},{row['VOLUME']},{tickType}\n"
+        csv_line = f"{csv_line}\n{new_time},{row['PRICE']},{row['VOLUME']},{tickType}"
 
     with open(filename, 'w', encoding='utf-8', newline='\n') as f:
       # 追加数据行

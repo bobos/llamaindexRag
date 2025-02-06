@@ -87,6 +87,7 @@ const ChatBot: React.FC = () => {
 
   return (
     <div className="chatbot-container">
+      {/*
       <div className="sidebar">
         <div className="system-prompt" style={{ textAlign: 'left' }}>
           System prompt:
@@ -101,10 +102,11 @@ const ChatBot: React.FC = () => {
             cols={150} />
         </form>
       </div>
+      */}
 
       <div className="chat-container">
         <div className='message-line'>
-          {thinking ? <div className="text-center">Almighty LLM is thinking, puny human is instructed to wait..</div> : undefined}
+          {thinking ? <div className="text-center">努力思考中..</div> : undefined}
         </div>
 
         <div className="display-area">

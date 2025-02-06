@@ -33,7 +33,7 @@ html, body {
 
 /* Main Chat Area */
 .chat-container {
-  width: 80%;
+  width: 100%;
   display: flex;
   flex-direction: column;
   justify-content: space-between;

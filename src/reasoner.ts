@@ -140,6 +140,9 @@ export async function generateTickFile(
     }
   }
 
+  let host = '192.168.0.131';
+  return axios.post(`http://${host}:3000/tick`, {tscode});
+
   // 执行Python脚本
   return execAsync(`python /project/tickData.py ${tscode}`, { 
     timeout: 5 * 60 * 1000 
