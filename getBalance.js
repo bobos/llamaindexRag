@@ -6,7 +6,7 @@ maxBodyLength: Infinity,
   url: 'https://api.deepseek.com/user/balance',
   headers: { 
     'Accept': 'application/json', 
-    'Authorization': 'Bearer isk-42ddf29b6b3c4df3a2df6ba089f9eb58'
+    'Authorization': 'Bearer sk-42ddf29b6b3c4df3a2df6ba089f9eb58'
   }
 };
 

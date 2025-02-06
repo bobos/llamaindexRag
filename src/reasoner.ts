@@ -1,12 +1,40 @@
 import OpenAI from "openai";
 import axios from 'axios';
-import { loadQuote, loadTick } from "./tickLoad";
+import { getFile, loadQuote, loadTick } from "./tickLoad";
 import * as fs from 'fs/promises';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+const execAsync = promisify(exec);
 
-const openai = new OpenAI({
+const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com/v1',
-  apiKey: 'isk-42ddf29b6b3c4df3a2df6ba089f9eb58'
+  apiKey: 'sk-42ddf29b6b3c4df3a2df6ba089f9eb58'
 });
+const siliconflow = new OpenAI({
+  baseURL: 'https://api.siliconflow.cn/v1',
+  apiKey: 'sk-bvwufaakubbvvzfrulsqeqtoklqtvdttxlpkhtahhwwompvs'
+});
+const baidu = new OpenAI({
+  baseURL: 'https://qianfan.baidubce.com/v2',
+  apiKey: 'bce-v3/ALTAK-oQZCuAGVoaFC16sCniSm7/5d8d26ff7c8daf8dde8b938eb62a080313d49d42'
+});
+
+enum Vendor {
+  baidu,
+  siliconflow,
+  deepseek
+}
+
+function getModelInfo(vendorName: Vendor): {modelName: string, model: OpenAI} {
+  if (vendorName === Vendor.baidu) {
+    return {modelName: 'deepseek-r1', model: baidu}
+  }
+
+  if (vendorName === Vendor.siliconflow) {
+    return {modelName: 'deepseek-ai/DeepSeek-R1', model: siliconflow}
+  }
+  return {modelName: 'deepseek-reasoner', model: deepseek}
+}
 
 export enum Role {
   System = 'system',
@@ -42,7 +70,7 @@ async function quoteDataAnalyze(req: {buy: boolean, systemPrompt: string, tsCode
   const quoteData = await loadQuote(req.tsCode);
   const result = await deepThink([
     {role: Role.System, content: req.systemPrompt},
-    {role: Role.User, content: `基于如下数据帮超短线投资客谨慎分析该股票明日上午涨跌,回答控制在500字内\n--------------------------------------\n概况:\n昨收:${req.yesterdayVal}, 市值:${req.totalVal}, 当前量比:${req.liangbi}\n--------------------------------------\n当日分时明细:\n${quoteData}`}
+    {role: Role.User, content: `基于如下数据帮超短线投资客谨慎分析该股票明日上午涨跌,回答控制在350字内\n--------------------------------------\n1.概况:\n昨收:${req.yesterdayVal}, 市值:${req.totalVal}\n--------------------------------------\n2.当日分时明细:\n${quoteData}`}
   ]);
   quoteAnalysisCache[req.tsCode] = result;
   return result;
@@ -53,21 +81,25 @@ export async function ask(chatRequest: ChatRequest): Promise<string> {
   let totalVal = `${stockData[45]}亿`;
   let liangbi = stockData[49];
   let yesterdayVal = stockData[4];
-  console.log(`昨收:${yesterdayVal}, 市值:${totalVal}, 当前量比:${liangbi}`);
+  console.log(`昨收:${yesterdayVal}, 市值:${totalVal}`);
+  let tickGeneration = generateTickFile(chatRequest.tsCode);
   const quoteAnalysisResult = quoteAnalysisCache[chatRequest.tsCode] || await quoteDataAnalyze({buy: chatRequest.buy, tsCode: chatRequest.tsCode, systemPrompt: chatRequest.systemPrompt, totalVal, liangbi, yesterdayVal});
+  await tickGeneration;
+  await fs.access(getFile(chatRequest.tsCode));
   const tickData = await loadTick(chatRequest.tsCode);
   await fs.writeFile('./theData.txt', tickData);
-  return await deepThink([
+  return `代码: ${chatRequest.tsCode}, 昨收: ${yesterdayVal}\n` + await deepThink([
     {role: Role.System, content: chatRequest.systemPrompt},
-    {role: Role.User, content: `基于如下数据帮超短线投资客谨慎分析该股票是否可以盘尾买入明早卖出\n--------------------------------------\n概况:\n昨收:${yesterdayVal}, 市值:${totalVal}, 当前量比:${liangbi}\n--------------------------------------\nAI助手基于当日分时数据的分析结论:\n${quoteAnalysisResult}\n--------------------------------------\n下午分笔成交明细:\n时间,价格(元),成交量,成交金额(元),成交类型(B买盘/S卖盘/中性盘N)\n${tickData}`}
+    {role: Role.User, content: `基于如下数据用简单易懂的语言回答超短线投资者:该股票是否可以盘尾买入明早卖出?\n--------------------------------------\n1.概况:\n昨收:${yesterdayVal}, 市值:${totalVal}\n--------------------------------------\n2.AI助手基于当日分时数据的分析结论:\n${quoteAnalysisResult}\n--------------------------------------\n3.尾盘14点:30到15点分笔成交明细:\n时间,价格,成交量,成交类型(B买盘/S卖盘/中性盘N)\n${tickData}`}
   ]);
 }
 
 async function deepThink(messages: Message[]): Promise<string> {
-  const stream = await openai.chat.completions.create({
+  const {modelName, model} = getModelInfo(Vendor.siliconflow);
+  const stream = await model.chat.completions.create({
     max_tokens: 1024 * 8,
     messages,
-    model: "deepseek-reasoner",
+    model: modelName,
     stream: true
   });
 
@@ -91,4 +123,25 @@ async function deepThink(messages: Message[]): Promise<string> {
   console.log('\n\nmodel response: ', content);
   
   return content;
+}
+
+export async function generateTickFile(
+  tscode: string
+): Promise<any> {
+  const tickFile = getFile(tscode);
+  // 检查并删除旧文件
+  try {
+    await fs.access(tickFile);
+    await fs.rm(tickFile);
+    console.log(`Deleted existing file: ${tickFile}`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  // 执行Python脚本
+  return execAsync(`python /project/tickData.py ${tscode}`, { 
+    timeout: 5 * 60 * 1000 
+  });
 }

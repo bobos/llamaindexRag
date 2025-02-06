@@ -1,8 +1,12 @@
 import * as fs from 'fs';
 
+export function getFile(tsCode:string): string {
+  return `/project/${tsCode}_tick.txt`;
+}
+
 export async function loadTick(tsCode: string, charLimit: number = 7500): Promise<string> {
   return new Promise((resolve, reject) => {
-    fs.readFile(`/project/${tsCode}_tick.txt`, 'utf8', (err, data) => {
+    fs.readFile(getFile(tsCode), 'utf8', (err, data) => {
       if (err) {
         return reject(err);
       }

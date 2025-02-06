@@ -2,7 +2,47 @@ import React, { useState } from 'react';
 import './app.css';
 import * as Apis from '../integration/apis';
 
-const defaultPrompt = "你是一个经验丰富的A股资深游资, 帮助用户提供谨慎的A股投资建议";
+const tscodes: any = {
+  '宝信软件': '600845.SH',
+  '岱美股份': '603730.SH',
+  '海尔智家': '600690.SH',
+  '华电国际': '600027.SH',
+  '平高电气': '600312.SH',
+  '三峡能源': '600905.SH',
+  '中国船舶': '600150.SH',
+  '中国海油': '600938.SH',
+  '特变电工': '600089.SH',
+  '大华股份': '002236.SZ',
+  '比音勒芬': '002832.SZ',
+  '桐昆股份': '601233.SH',
+  '华阳股份': '600348.SH',
+  '山西焦煤': '000983.SZ',
+  '中文传媒': '600373.SH',
+  '凤凰传媒': '601928.SH',
+  '新天然气': '603393.SH',
+  '鹏鼎控股': '002938.SZ',
+  '燕京啤酒': '000729.SZ',
+  '海信家电': '000921.SZ',
+  '圆通速递': '600233.SH',
+  '国投电力': '600886.SH',
+  '招商轮船': '601872.SH',
+  '中远海能': '600026.SH',
+  '钱江摩托': '000913.SZ',
+  '宁波华翔': '002048.SZ',
+  '中航西飞': '000768.SZ',
+  '葵花药业': '002737.SZ',
+  '白云山': '600332.SH',
+  '中国重工': '601989.SH',
+  '环旭电子': '601231.SH',
+  '农业银行': '601288.SH',
+  '新希望': '000876.SZ',
+  '千禾味业': '603027.SH',
+  '中金黄金': '600489.SH',
+  '洛阳钼业': '603993.SH',
+  '创新新材': '600361.SH'
+}
+
+const defaultPrompt = "以A股资深游资视角, 帮助用户提供谨慎的A股投资建议";
 let thinking = false;
 const ChatBot: React.FC = () => {
   const [userInput, setUserInput] = useState('');
@@ -18,11 +58,16 @@ const ChatBot: React.FC = () => {
 
     if (!userInput.trim()) return; // Do nothing if input is empty
     // build chat request
-    const userMessage = { role: Apis.Role.User, content: `股票代码: ${userInput}` };
+    let tsCode = tscodes[userInput];
+    if (!tsCode) {
+      alert('股票找不到!');
+      return;
+    }
+    const userMessage = { role: Apis.Role.User, content: `${userInput}` };
     const reqBody: Apis.ChatRequest = {
       buy: true,
       systemPrompt,
-      tsCode: userInput,
+      tsCode
     }
 
     setchatHistory((prev) => [...prev, userMessage]);
