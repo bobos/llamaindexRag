@@ -42,10 +42,23 @@ const tscodes: any = {
   '创新新材': '600361.SH'
 }
 
+enum Status {
+  idle,
+  initSend,
+  ongoing,
+  cacheHit,
+  error
+}
+
 const defaultPrompt = "以A股资深游资视角, 帮助用户提供谨慎的A股投资建议";
-let thinking = false;
+let thinking = Status.idle;
 const ChatBot: React.FC = () => {
-  const [userInput, setUserInput] = useState('');
+  const [userInput, setUserInput] = useState(() => {
+    // Initialize state with cached value or empty string
+    const cachedValue = localStorage.getItem('userInputCache');
+    return cachedValue ? cachedValue : '';
+  });
+
   const [systemPrompt, setSystemPrompt] = useState(defaultPrompt);
   const [parameters, setParameters] = useState({ temperature: 0, top_p: 1, max_tokens: 1024 }); // Initial parameters
   const [chatHistory, setchatHistory] = useState<Apis.Message[]>(
@@ -58,9 +71,10 @@ const ChatBot: React.FC = () => {
 
     if (!userInput.trim()) return; // Do nothing if input is empty
     // build chat request
+    localStorage.setItem('userInputCache', userInput);
     let tsCode = tscodes[userInput];
     if (!tsCode) {
-      alert('股票找不到!');
+      alert('股票找球不倒!');
       return;
     }
     const userMessage = { role: Apis.Role.User, content: `${userInput}` };
@@ -73,11 +87,20 @@ const ChatBot: React.FC = () => {
     setchatHistory((prev) => [...prev, userMessage]);
     // Clear the user input
     setUserInput('');
-    thinking = true;
+    thinking = Status.initSend;
     Apis.chat(reqBody).then((botMessage: string) => {
-      thinking = false;
+      if (botMessage === 'ongoing') {
+        thinking = Status.ongoing;
+        botMessage = '...';
+      }
+      else if (botMessage.startsWith('cacheHit_')) {
+        thinking = Status.cacheHit;
+        botMessage = botMessage.slice('cacheHit_'.length, botMessage.length);
+      } else {
+        thinking = Status.idle;
+      }
       setchatHistory((prev) => [...prev, {role: Apis.Role.Assistant, content: botMessage}]);
-    }, (e: any) => { alert(JSON.stringify(e)) })
+    }, (e: any) => { thinking = Status.error, alert(JSON.stringify(e)) })
   };
 
   const handlePrompt = (e: React.FormEvent<HTMLFormElement>) => {
@@ -106,7 +129,19 @@ const ChatBot: React.FC = () => {
 
       <div className="chat-container">
         <div className='message-line'>
-          {thinking ? <div className="text-center">努力思考中..</div> : undefined}
+          {(() => {
+            switch (thinking) {
+            case Status.ongoing:
+              return <div className="text-center">正在处理..</div>;
+            case Status.initSend:
+              return <div className="text-center">努力思考中..</div>;
+            case Status.cacheHit:
+              return <div className="text-center">缓存命中!</div>;
+            case Status.error:
+              return <div className="text-center">处理出错!</div>;
+            default:
+              return undefined;}
+          })()}
         </div>
 
         <div className="display-area">

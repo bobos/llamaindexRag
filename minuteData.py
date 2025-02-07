@@ -3,23 +3,26 @@ import os
 import tushare as ts
 import time
 
-# 中航西飞 000768.SZ
-# 特变电工 600089.SH
-# 比音 002832.SZ
-# 山西焦煤 000983.SZ *
-# 燕京啤酒 000729.SZ *
-# 中远海能 600026.SH
-# 葵花药业 002737.SZ *
-# 白云山 600332.SH
-# 千禾味业 603027.SH
-# 中国船舶 600150.SH
-# 平高电气 600312.SH *
+import datetime  # Add this import at the top
 
-ts_code = '000768.SZ,600089.SH,002832.SZ,000983.SZ,000729.SZ,600026.SH,002737.SZ,600332.SH,603027.SH,600150.SH,600312.SH'
+def is_trading_time():
+    now = datetime.datetime.now().time()
+    morning_start = datetime.time(9, 30)
+    morning_end = datetime.time(11, 30)
+    afternoon_start = datetime.time(12, 59)
+    afternoon_end = datetime.time(15, 0)
+    return (morning_start <= now <= morning_end) or (afternoon_start <= now <= afternoon_end)
+
+ts_code = '600845.SH,603730.SH,600690.SH,600027.SH,600312.SH,600905.SH,600150.SH,600938.SH,600089.SH,002236.SZ,002832.SZ,601233.SH,600348.SH,000983.SZ,600373.SH,601928.SH,603393.SH,002938.SZ,000729.SZ,000921.SZ,600233.SH,600886.SH,601872.SH,600026.SH,000913.SZ,002048.SZ,000768.SZ,002737.SZ,00332.SH,601989.SH,601231.SH,601288.SH,00876.SZ,603027.SH,600489.SH,603993.SH,600361.SH'
 quoteCache = set()
 
 while True:
   try:
+    if not is_trading_time():
+      print("当前时间不在交易时段内，等待1分钟...")
+      time.sleep(60)
+      continue
+
     df = ts.realtime_quote(ts_code=ts_code)
 
     for _, row in df.iterrows():
