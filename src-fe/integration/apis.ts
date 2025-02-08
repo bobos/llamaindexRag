@@ -9,7 +9,13 @@ export interface Message {
   content: string;
 }
 
+export enum Vendor {
+  deepseek = 'deepseek',
+  siliconflow = 'siliconflow'
+}
+
 export interface ChatRequest {
+  vendor: Vendor,
   buy: boolean;
   systemPrompt: string;
   tsCode: string;

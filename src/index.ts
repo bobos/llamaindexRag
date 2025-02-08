@@ -25,7 +25,7 @@ app.post('/ask', async (req: express.Request, res: express.Response) => {
     res.status(200).json({result: response});
   } catch (e) {
     console.error('异常', e);
-    res.status(500).json(JSON.stringify(e))
+    res.status(200).json({result: JSON.stringify(e)})
   }
 });
 

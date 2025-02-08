@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import axios from 'axios';
-import { getFile, loadQuote, loadTick } from "./tickLoad";
+import { aggregateTickData, getFile, loadAllTick, loadQuote, loadTick } from "./tickLoad";
 import * as fs from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -20,9 +20,9 @@ const baidu = new OpenAI({
 });
 
 enum Vendor {
-  baidu,
-  siliconflow,
-  deepseek
+  baidu = 'baidu',
+  siliconflow = 'siliconflow',
+  deepseek = 'deepseek'
 }
 
 function getModelInfo(vendorName: Vendor): {modelName: string, model: OpenAI} {
@@ -31,7 +31,7 @@ function getModelInfo(vendorName: Vendor): {modelName: string, model: OpenAI} {
   }
 
   if (vendorName === Vendor.siliconflow) {
-    return {modelName: 'deepseek-ai/DeepSeek-R1', model: siliconflow}
+    return {modelName: 'Pro/deepseek-ai/DeepSeek-R1', model: siliconflow}
   }
   return {modelName: 'deepseek-reasoner', model: deepseek}
 }
@@ -48,12 +48,13 @@ export interface Message {
 }
 
 export interface ChatRequest {
+  vendor: Vendor,
   buy: boolean;
   systemPrompt: string;
   tsCode: string;
 }
 
-let conclusionCache: {[tsCode: string]: {ongoing: boolean, cache?: string}} = {};
+let conclusionCache: {[tsCode: string]: {ongoing: boolean, cache1?: string, cache2?: string}} = {};
 
 async function fetchStockData(tsCode: string): Promise<string[]> {
   try {
@@ -66,12 +67,22 @@ async function fetchStockData(tsCode: string): Promise<string[]> {
   }
 }
 
-async function quoteDataAnalyze(req: {buy: boolean, systemPrompt: string, tsCode: string, totalVal: string, yesterdayVal: string, liangbi: string}): Promise<string> {
-  const quoteData = await loadQuote(req.tsCode);
-  return await deepThink([
+async function quoteDataAnalyze(vendor: Vendor, req: {buy: boolean, systemPrompt: string, tsCode: string, totalVal: string, yesterdayVal: string, liangbi: string}): Promise<string> {
+  //const quoteData = await loadQuote(req.tsCode);
+  const quoteData = await aggregateTickData(req.tsCode);
+  await fs.writeFile('./theQuoteData.txt', quoteData);
+  return await deepThink(vendor, [
     {role: Role.System, content: req.systemPrompt},
-    {role: Role.User, content: `基于如下数据帮超短线投资客谨慎分析该股票明日上午涨跌,回答控制在350字内\n--------------------------------------\n1.概况:\n昨收:${req.yesterdayVal}, 市值:${req.totalVal}\n--------------------------------------\n2.当日分时明细:\n${quoteData}`}
+    {role: Role.User, content: `严格基于如下数据不要假设任何数据,帮激进的超短线投资客谨慎分析该股票明日上午表现从1到5颗星(1是不推荐买入,5是非常推荐买入),回答控制在500字内\n--------------------------------------\n1.概况:\n昨收:${req.yesterdayVal}, 市值:${req.totalVal}\n--------------------------------------\n2.当日分时明细:\n${quoteData}`}
   ]);
+}
+
+function getResult(cache1: string, cache2?: string): string {
+  let ret = '<p>第一结论:<br>' + cache1;
+  if (cache2) {
+    ret = ret+'<br>第二结论:<br>'+cache2;
+  }
+  return ret+'</p>';
 }
 
 export async function ask(chatRequest: ChatRequest): Promise<string> {
@@ -81,8 +92,8 @@ export async function ask(chatRequest: ChatRequest): Promise<string> {
       return 'ongoing';
     }
 
-    if (conclusion.cache) {
-      let ret = conclusion.cache;
+    if (conclusion.cache1) {
+      let ret = getResult(conclusion.cache1, conclusion.cache2);
       delete conclusionCache[chatRequest.tsCode];
       return 'cacheHit_' + ret;
     }
@@ -95,26 +106,27 @@ export async function ask(chatRequest: ChatRequest): Promise<string> {
   console.log(`昨收:${yesterdayVal}, 市值:${totalVal}`);
   conclusionCache[chatRequest.tsCode] = {ongoing: true};
   try {
-    let tickGeneration = generateTickFile(chatRequest.tsCode);
-    const quoteAnalysisResult = await quoteDataAnalyze({buy: chatRequest.buy, tsCode: chatRequest.tsCode, systemPrompt: chatRequest.systemPrompt, totalVal, liangbi, yesterdayVal});
-    await tickGeneration;
+    await generateTickFile(chatRequest.tsCode);
     await fs.access(getFile(chatRequest.tsCode));
+    const quoteAnalysisResult = await quoteDataAnalyze(chatRequest.vendor, {buy: chatRequest.buy, tsCode: chatRequest.tsCode, systemPrompt: chatRequest.systemPrompt, totalVal, liangbi, yesterdayVal});
+    conclusionCache[chatRequest.tsCode].cache1 = quoteAnalysisResult;
     const tickData = await loadTick(chatRequest.tsCode);
     await fs.writeFile('./theData.txt', tickData);
-    let finalRet = `代码: ${chatRequest.tsCode}, 昨收: ${yesterdayVal}\n` + await deepThink([
+    let finalRet = `代码: ${chatRequest.tsCode}, 昨收: ${yesterdayVal}\n` + await deepThink(chatRequest.vendor, [
       {role: Role.System, content: chatRequest.systemPrompt},
-      {role: Role.User, content: `基于如下数据用简单易懂的语言回答超短线投资者:该股票是否可以盘尾买入明早卖出?\n--------------------------------------\n1.概况:\n昨收:${yesterdayVal}, 市值:${totalVal}\n--------------------------------------\n2.AI助手基于当日分时数据的分析结论:\n${quoteAnalysisResult}\n--------------------------------------\n3.最新分笔成交明细:\n时间,价格,成交量,成交类型(B买盘/S卖盘/中性盘N)\n${tickData}`}
+      {role: Role.User, content: `严格基于如下数据不要假设任何数据,回答激进超短线投资者的问题:购买推荐从1到5颗星(1是不推荐,5是非常推荐),该股票盘尾买入明早卖出推荐值是几星?\n--------------------------------------\n1.概况:\n昨收:${yesterdayVal}, 市值:${totalVal}\n--------------------------------------\n2.资深游资基于当日分时数据的分析结论:\n${quoteAnalysisResult}\n--------------------------------------\n3.最新分笔成交明细:\n时间,价格,成交量,成交类型(B买盘/S卖盘/中性盘N)\n${tickData}`}
     ]);
-    conclusionCache[chatRequest.tsCode] = {ongoing: false, cache: finalRet};
-    return finalRet;
+    conclusionCache[chatRequest.tsCode].ongoing = false;
+    conclusionCache[chatRequest.tsCode].cache2 = finalRet;
+    return getResult(quoteAnalysisResult, finalRet);
   } catch(e) {
-    conclusionCache[chatRequest.tsCode] = {ongoing: false, cache: '处理异常，请重试'};
+    conclusionCache[chatRequest.tsCode] = {ongoing: false, cache1: `处理异常，${JSON.stringify(e)}`};
     throw e;
   }
 }
 
-async function deepThink(messages: Message[]): Promise<string> {
-  const {modelName, model} = getModelInfo(Vendor.siliconflow);
+async function deepThink(vendor: Vendor, messages: Message[]): Promise<string> {
+  const {modelName, model} = getModelInfo(vendor);
   const stream = await model.chat.completions.create({
     max_tokens: 1024 * 8,
     messages,

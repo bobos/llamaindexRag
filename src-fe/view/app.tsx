@@ -59,6 +59,7 @@ const ChatBot: React.FC = () => {
     return cachedValue ? cachedValue : '';
   });
 
+  const [selectedService, setSelectedService] = useState(Apis.Vendor.siliconflow);
   const [systemPrompt, setSystemPrompt] = useState(defaultPrompt);
   const [parameters, setParameters] = useState({ temperature: 0, top_p: 1, max_tokens: 1024 }); // Initial parameters
   const [chatHistory, setchatHistory] = useState<Apis.Message[]>(
@@ -79,6 +80,7 @@ const ChatBot: React.FC = () => {
     }
     const userMessage = { role: Apis.Role.User, content: `${userInput}` };
     const reqBody: Apis.ChatRequest = {
+      vendor: selectedService,
       buy: true,
       systemPrompt,
       tsCode
@@ -150,9 +152,7 @@ const ChatBot: React.FC = () => {
               {message.role === Apis.Role.Assistant ?
                 <div className="message-line">
                   <div className="icon-background" />
-                  <div className="assistant-text-area" style={{ textAlign: 'left' }}>
-                    {message.content}
-                  </div>
+                  <div className="assistant-text-area" style={{textAlign: 'left'}} dangerouslySetInnerHTML={{ __html: message.content }} />
                 </div> :
                 <div className="message-line text-right">
                   <div className="text-area">
@@ -164,15 +164,24 @@ const ChatBot: React.FC = () => {
           ))}
         </div>
 
-        {/* Component 4: Input Box */}
         <form onSubmit={handleSubmit} className="input-form">
           <input
             type="text"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
             className="input-box"
-            placeholder="Your query..."
+            placeholder="股票名字"
           />
+
+          {/* New service selection dropdown */}
+          <select 
+            value={selectedService}
+            onChange={(e) => setSelectedService(e.target.value as Apis.Vendor)}
+            className="service-select"
+          >
+            <option value="siliconflow">SiliconFlow</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
 
           {/* Component 5: Submit Button */}
           <button type="submit" className="submit-button">
