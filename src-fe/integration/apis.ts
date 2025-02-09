@@ -15,13 +15,16 @@ export enum Vendor {
 }
 
 export interface ChatRequest {
-  vendor: Vendor,
+  name: string;
+  bankuai: string;
+  vendor: Vendor;
   buy: boolean;
   systemPrompt: string;
-  tsCode: string;
+  tscode: string;
 }
 
 export async function chat(request: ChatRequest): Promise<string> {
+  console.log('send');
   const response = await fetch('/ask', {
     method: 'POST',
     headers: {
@@ -30,7 +33,19 @@ export async function chat(request: ChatRequest): Promise<string> {
     body: JSON.stringify(request)
   });
   let rsp = await response.json();
-  console.log(rsp);
+
+  try {
+    return rsp.result;
+  } catch (e) {
+    throw e;
+  }
+}
+
+export async function getAll(): Promise<string> {
+  const response = await fetch('/shortList', {
+    method: 'GET',
+  });
+  let rsp = await response.json();
 
   try {
     return rsp.result;

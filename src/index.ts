@@ -1,7 +1,7 @@
 import * as http from 'http';
 import * as path from 'path';
 import express from 'express'; 
-import { ask } from './reasoner';
+import { ask, shortConclusion } from './reasoner';
 
 console.log('start express server');
 
@@ -23,6 +23,16 @@ app.post('/ask', async (req: express.Request, res: express.Response) => {
     console.log('receive request', req.body);
     let response = await ask(req.body);
     res.status(200).json({result: response});
+  } catch (e) {
+    console.error('异常', e);
+    res.status(200).json({result: JSON.stringify(e)})
+  }
+});
+
+app.get('/shortList', async (req: express.Request, res: express.Response) => {
+  try {
+    console.log('receive request', req.body);
+    res.status(200).json({result: '<p>' + Object.values(shortConclusion).map((c:any) => c.cache).join('<br>') + '</p>'});
   } catch (e) {
     console.error('异常', e);
     res.status(200).json({result: JSON.stringify(e)})
