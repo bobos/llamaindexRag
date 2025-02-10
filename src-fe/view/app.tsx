@@ -99,12 +99,16 @@ const ChatBot: React.FC = () => {
         setTimeout(() => {Apis.chat(reqBody)}, time);
         time += delay * 1000;
       });
+      thinking = Status.ongoing;
+      setchatHistory((prev) => [...prev, { role: Apis.Role.Assistant, content: '拼命处理中...' }]);
+      setUserInput('');
       return;
     }
 
     if (userInput === '666') {
       // get batch result
       Apis.getAll().then((botMessage: string) => {
+        thinking = Status.idle;
         setchatHistory((prev) => [...prev, { role: Apis.Role.Assistant, content: botMessage }]);
       }, (e: any) => { thinking = Status.error, alert(JSON.stringify(e)) })
       return;

@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import axios from 'axios';
-import { aggregateTickData, getFile, getMarginShort, loadAllTick, loadQuote, loadTick } from "./tickLoad";
+import { aggregateTickData, getFile, getMarginShort, getTickString, loadAllTick, loadQuote, loadTick } from "./tickLoad";
 import * as fs from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -94,11 +94,12 @@ async function fetchStockData(tscode: string): Promise<BaseStockData> {
 
 async function quoteDataAnalyze(vendor: Vendor, systemPrompt: string, sd: StockData): Promise<string> {
   //const quoteData = await loadQuote(req.tsCode);
-  const quoteData = await aggregateTickData(sd.tscode);
-  //await fs.writeFile('./theQuoteData.txt', quoteData);
+  const lines = await loadAllTick(sd.tscode);
+  const quoteData = await aggregateTickData(lines);
   return await deepThink(vendor, [
     { role: Role.System, content: systemPrompt },
-    { role: Role.User, content: `严格基于如下数据不要假设任何数据,帮激进的超短线投资客谨慎分析该股票明日上午表现从1到5颗星(1是不推荐买入,5是非常推荐买入),回答以"x颗星"开头并控制在500字内\n--------------------------------------\n1.概况:\n${initPrompt(sd)}\n--------------------------------------\n2.当日分时明细:\n${quoteData}` }
+    //{ role: Role.User, content: `严格基于如下数据不要假设任何数据,帮激进的超短线投资客谨慎分析该股票明日上午表现从1到5颗星(1是不推荐买入,5是非常推荐买入),回答以"x颗星"开头并控制在500字内\n--------------------------------------\n1.概况:\n${initPrompt(sd)}\n--------------------------------------\n2.当日分时明细:\n${quoteData}` }
+    { role: Role.User, content: `严格基于如下数据不要假设任何数据,回答超短线投资者的问题:购买推荐从1到5颗星(1是不推荐,5是非常推荐),该股票盘尾买入明早卖出,在微幅上涨也可接受前提下,推荐值是几星,回答以"x颗星"开头,并简单易懂说明理由.\n--------------------------------------\n1.概况:\n${initPrompt(sd)}\n--------------------------------------\n2.当日分时明细:\n${quoteData}\n--------------------------------------\n3.最近分笔成交明细:\n时间,价格,成交量,成交类型(B买盘/S卖盘/中性盘N)\n${getTickString(lines)}` }
   ]);
 }
 
@@ -143,6 +144,8 @@ export async function ask(chatRequest: ChatRequest): Promise<string> {
     conclusionCache[sd.tscode].cache1 = quoteAnalysisResult;
     shortConclusion[sd.tscode] = {cache: ''};
     shortConclusion[sd.tscode].cache = sd.name + ':' + quoteAnalysisResult.substring(0, quoteAnalysisResult.indexOf('星')+1);
+    conclusionCache[sd.tscode].ongoing = false;
+    return getResult(sd.name, quoteAnalysisResult);
     // fetch the latest tick
     await generateTickFile(sd.tscode);
     await fs.access(getFile(sd.tscode));

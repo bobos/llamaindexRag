@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
+import * as pfs from 'fs/promises';
 
 export function getFile(tsCode: string): string {
   return `/project/${tsCode}_tick.txt`;
@@ -28,6 +29,23 @@ export async function loadTick(tsCode: string, charLimit: number = 15000): Promi
       resolve(collectedLines.join('\n'));
     });
   });
+}
+
+export async function getTickString(lines: string[], charLimit: number = 30000): Promise<string> {
+  let totalChars = 0;
+  const collectedLines: string[] = [];
+
+  for (const line of lines.reverse()) {
+    totalChars += line.length + 1; // 包含换行符
+    collectedLines.push(line);
+    if (totalChars > charLimit) {
+      break;
+    }
+  }
+
+  const ret = collectedLines.reverse().join('\n');
+  //await pfs.writeFile('./theData.txt', ret);
+  return ret;
 }
 
 export async function loadAllTick(tsCode: string): Promise<string[]> {
@@ -66,8 +84,7 @@ interface StatisticEntry {
   accShou: number;
 }
 
-export async function aggregateTickData(tsCode: string): Promise<string> {
-  const lines = await loadAllTick(tsCode);
+export function aggregateTickData(lines: string[]): string {
   const statsMap: { [key: string]: StatisticEntry } = {};
 
   let accQian = 0; //累计成交金额
