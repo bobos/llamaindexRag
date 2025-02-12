@@ -2,9 +2,18 @@ import * as fs from 'fs';
 import * as cheerio from 'cheerio';
 import axios from 'axios';
 import * as pfs from 'fs/promises';
+import { generateTickFile } from './reasoner';
 
 export function getFile(tsCode: string): string {
   return `/project/${tsCode}_tick.txt`;
+}
+
+export function getYesterdayFile(tsCode: string): string {
+  return `/project/${tsCode}_yesterday_quote.txt`;
+}
+
+function getYesterdayMarginFile(tsCode: string): string {
+  return `/project/${tsCode}_yesterday_margin.txt`;
 }
 
 export async function loadTick(tsCode: string, charLimit: number = 15000): Promise<string> {
@@ -44,7 +53,7 @@ export async function getTickString(lines: string[], charLimit: number = 30000):
   }
 
   const ret = collectedLines.reverse().join('\n');
-  //await pfs.writeFile('./theData.txt', ret);
+  await pfs.writeFile('./theData.txt', ret);
   return ret;
 }
 
@@ -58,6 +67,39 @@ export async function loadAllTick(tsCode: string): Promise<string[]> {
       resolve(data.split('\n'));
     });
   });
+}
+
+export async function loadYesterdayData(tsCode: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    fs.readFile(getYesterdayFile(tsCode), 'utf8', (err, data) => {
+      if (err) {
+        return reject(err);
+      }
+
+      resolve(data);
+    });
+  });
+}
+
+export async function loadYesterdayMargin(tsCode: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    fs.readFile(getYesterdayMarginFile(tsCode), 'utf8', (err, data) => {
+      if (err) {
+        return reject(err);
+      }
+
+      resolve(data);
+    });
+  });
+}
+
+export async function generateYesterdayFile(tscode: string): Promise<void> {
+  await generateTickFile(tscode);
+  await pfs.access(getFile(tscode));
+  const data = aggregateTickData(await loadAllTick(tscode), true);
+  await pfs.writeFile(getYesterdayFile(tscode), data);
+  let [code, _] = tscode.split('.');
+  await pfs.writeFile(getYesterdayMarginFile(tscode), await getMarginShort(code));
 }
 
 export async function loadQuote(tsCode: string): Promise<string> {
@@ -84,7 +126,7 @@ interface StatisticEntry {
   accShou: number;
 }
 
-export function aggregateTickData(lines: string[]): string {
+export function aggregateTickData(lines: string[], downsample?: boolean): string {
   const statsMap: { [key: string]: StatisticEntry } = {};
 
   let accQian = 0; //累计成交金额
@@ -92,7 +134,19 @@ export function aggregateTickData(lines: string[]): string {
 
   // 处理时间转换（HH:MM:SS -> HH:MM:00）
   const toMinuteKey = (timeStr: string) => {
-    const [h, m] = timeStr.split(':');
+    let [h, m] = timeStr.split(':');
+    if (downsample) {
+      let min = parseInt(`${(parseInt(m)/5)}`)*5 + 5;
+      m = `${min}`;
+      if (min < 10) {
+        m = `0${min}`;
+      }
+      if (min === 60) {
+        m = '00';
+        let hour = parseInt(h) + 1; 
+        h = (hour < 10 ? '0' : '') + hour;
+      }
+    }
     return `${h}:${m}:00`;
   };
 
@@ -148,7 +202,7 @@ export function aggregateTickData(lines: string[]): string {
   }
 
   const statsArray = Object.values(statsMap).map((record: StatisticEntry) => { return {...record, avg: (record.accQian / record.accShou).toFixed(2)} });
-  return '时间,现价(元),分时均价(元),一分钟内总成交数(手),一分钟内总成交金额(元),一分钟内买盘成交数(手),一分钟内卖盘成交数(手)\n' +
+  return (downsample ? '时间,现价(元),分时均价(元),五分钟内总成交数(手),五分钟内总成交金额(元),五分钟内买盘成交数(手),五分钟内卖盘成交数(手)\n' : '时间,现价(元),分时均价(元),一分钟内总成交数(手),一分钟内总成交金额(元),一分钟内买盘成交数(手),一分钟内卖盘成交数(手)\n') +
     statsArray.sort((a, b) => a.time.localeCompare(b.time)).map((record: StatisticEntry) => `${record.time},${record.price},${record.avg},${record.totalAmount},${Math.round(record.totalVal)},${record.totalAmountOfBuy},${record.totalAmountOfSell}`).join('\n');
 }
 

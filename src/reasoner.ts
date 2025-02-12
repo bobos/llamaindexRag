@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import axios from 'axios';
-import { aggregateTickData, getFile, getMarginShort, getTickString, loadAllTick, loadQuote, loadTick } from "./tickLoad";
+import { aggregateTickData, getFile, getMarginShort, getTickString, loadAllTick, loadQuote, loadTick, loadYesterdayData, loadYesterdayMargin } from "./tickLoad";
 import * as fs from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -54,6 +54,7 @@ export interface ChatRequest {
   buy: boolean;
   systemPrompt: string;
   tscode: string;
+  customQuery?: string;
 }
 
 interface BaseStockData {
@@ -63,6 +64,7 @@ interface BaseStockData {
   liangbi: string;
   shizhi: string;
   runzirunquan: string;
+  yesterdayMargin: string;
 }
 
 interface StockData extends BaseStockData {
@@ -84,7 +86,8 @@ async function fetchStockData(tscode: string): Promise<BaseStockData> {
       zhangfu: `${ret[32]}%`,
       liangbi: ret[49],
       shizhi: `${ret[45]}亿`,
-      runzirunquan: await getMarginShort(code)
+      runzirunquan: await getMarginShort(code),
+      yesterdayMargin: await loadYesterdayMargin(tscode),
     }
   } catch (error) {
     console.error('Error fetching stock data:', error);
@@ -92,19 +95,20 @@ async function fetchStockData(tscode: string): Promise<BaseStockData> {
   }
 }
 
-async function quoteDataAnalyze(vendor: Vendor, systemPrompt: string, sd: StockData): Promise<string> {
+async function quoteDataAnalyze(buy: boolean, vendor: Vendor, systemPrompt: string, sd: StockData, customQuery?: string): Promise<string> {
   //const quoteData = await loadQuote(req.tsCode);
   const lines = await loadAllTick(sd.tscode);
   const quoteData = await aggregateTickData(lines);
+  const yesterdayQuote = await loadYesterdayData(sd.tscode);
+  const query = !buy ? `该股买入价为${customQuery},给出该股当日止盈止损建议.` : (customQuery || '该股今日可建底仓吗?');
   return await deepThink(vendor, [
     { role: Role.System, content: systemPrompt },
-    //{ role: Role.User, content: `严格基于如下数据不要假设任何数据,帮激进的超短线投资客谨慎分析该股票明日上午表现从1到5颗星(1是不推荐买入,5是非常推荐买入),回答以"x颗星"开头并控制在500字内\n--------------------------------------\n1.概况:\n${initPrompt(sd)}\n--------------------------------------\n2.当日分时明细:\n${quoteData}` }
-    { role: Role.User, content: `严格基于如下数据不要假设任何数据,回答超短线投资者的问题:购买推荐从1到5颗星(1是不推荐,5是非常推荐),该股票盘尾买入明早卖出,在微幅上涨也可接受前提下,推荐值是几星,回答以"x颗星"开头,并简单易懂说明理由.\n--------------------------------------\n1.概况:\n${initPrompt(sd)}\n--------------------------------------\n2.当日分时明细:\n${quoteData}\n--------------------------------------\n3.最近分笔成交明细:\n时间,价格,成交量,成交类型(B买盘/S卖盘/中性盘N)\n${getTickString(lines)}` }
+    { role: Role.User, content: `严格基于如下数据不要捏造任何数据,通过你的量化模型严谨计算,回答超短线投资者的问题:${query}\n--------------------------------------\n1.该股概况:\n${initPrompt(sd)}\n--------------------------------------\n2.该股当日分时明细:\n${quoteData}\n--------------------------------------\n3.该股昨日分时明细:\n${yesterdayQuote}\n--------------------------------------\n4.该股最近分笔成交明细:\n时间,价格,成交量,成交类型(B买盘/S卖盘/中性盘N)\n${getTickString(lines)}` }
   ]);
 }
 
 function getResult(name: string, cache1: string, cache2?: string): string {
-  let ret = `<p>${name}:<br>第一结论:<br>${cache1}`;
+  let ret = `<p>${name}:<br>${cache1}`;
   if (cache2) {
     ret = ret + '<br>第二结论:<br>' + cache2;
   }
@@ -112,8 +116,7 @@ function getResult(name: string, cache1: string, cache2?: string): string {
 }
 
 function initPrompt(sd: StockData): string {
-  //return `股票:${sd.name},市值:${sd.shizhi},昨收:${sd.zuoshou},涨幅:${sd.zhangfu},板块涨幅:${sd.bankuai}\n${sd.runzirunquan}`;
-  return `股票:${sd.name},市值:${sd.shizhi},昨收:${sd.zuoshou},涨幅:${sd.zhangfu}\n${sd.runzirunquan}`;
+  return `股票:${sd.name},市值:${sd.shizhi},昨收:${sd.zuoshou},涨幅:${sd.zhangfu}\n当日融资融券数据:${sd.runzirunquan}\n昨日融资融券数据:${sd.yesterdayMargin}`;
 }
 
 export async function ask(chatRequest: ChatRequest): Promise<string> {
@@ -140,25 +143,12 @@ export async function ask(chatRequest: ChatRequest): Promise<string> {
   try {
     await generateTickFile(sd.tscode);
     await fs.access(getFile(sd.tscode));
-    const quoteAnalysisResult = await quoteDataAnalyze(chatRequest.vendor, chatRequest.systemPrompt, sd);
+    const quoteAnalysisResult = await quoteDataAnalyze(chatRequest.buy, chatRequest.vendor, chatRequest.systemPrompt, sd, chatRequest.customQuery);
     conclusionCache[sd.tscode].cache1 = quoteAnalysisResult;
     shortConclusion[sd.tscode] = {cache: ''};
-    shortConclusion[sd.tscode].cache = sd.name + ':' + quoteAnalysisResult.substring(0, quoteAnalysisResult.indexOf('星')+1);
+    shortConclusion[sd.tscode].cache = sd.name + ':' + quoteAnalysisResult;
     conclusionCache[sd.tscode].ongoing = false;
     return getResult(sd.name, quoteAnalysisResult);
-    // fetch the latest tick
-    await generateTickFile(sd.tscode);
-    await fs.access(getFile(sd.tscode));
-    const tickData = await loadTick(sd.tscode);
-//    await fs.writeFile('./theData.txt', tickData);
-    let finalRet = await deepThink(chatRequest.vendor, [
-      { role: Role.System, content: chatRequest.systemPrompt },
-      { role: Role.User, content: `严格基于如下数据不要假设任何数据,回答激进超短线投资者的问题:购买推荐从1到5颗星(1是不推荐,5是非常推荐),该股票盘尾买入明早卖出推荐值是几星,回答以"x颗星"开头.\n--------------------------------------\n1.概况:\n${initPrompt(sd)}\n--------------------------------------\n2.资深游资基于当日分时数据的分析结论:\n${quoteAnalysisResult}\n--------------------------------------\n3.最近的分笔成交明细:\n时间,价格,成交量,成交类型(B买盘/S卖盘/中性盘N)\n${tickData}` }
-    ]);
-    conclusionCache[sd.tscode].ongoing = false;
-    conclusionCache[sd.tscode].cache2 = finalRet;
-    shortConclusion[sd.tscode].cache = shortConclusion[sd.tscode].cache + '||' + finalRet.substring(0, finalRet.indexOf('星')+1);
-    return getResult(sd.name, quoteAnalysisResult, finalRet);
   } catch (e) {
     conclusionCache[sd.tscode] = { ongoing: false, cache1: `处理异常，${JSON.stringify(e)}` };
     throw e;
@@ -199,6 +189,7 @@ async function deepThink(vendor: Vendor, messages: Message[]): Promise<string> {
 export async function generateTickFile(
   tscode: string
 ): Promise<any> {
+  console.log('generating', tscode);
   const tickFile = getFile(tscode);
   // 检查并删除旧文件
   try {

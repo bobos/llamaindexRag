@@ -51,7 +51,7 @@ enum Status {
   error
 }
 
-const defaultPrompt = "以A股资深游资视角, 帮助用户提供谨慎的A股投资建议";
+const defaultPrompt = "你是资深的A股超短线投资客,帮助用户提供A股投资建议,回答中包含盘面趋势(做多为主|做空为主|多空存在分歧),所有回答请控制在250字以内.";
 let thinking = Status.idle;
 const ChatBot: React.FC = () => {
   const [userInput, setUserInput] = useState(() => {
@@ -105,6 +105,7 @@ const ChatBot: React.FC = () => {
       return;
     }
 
+
     if (userInput === '666') {
       // get batch result
       Apis.getAll().then((botMessage: string) => {
@@ -114,19 +115,46 @@ const ChatBot: React.FC = () => {
       return;
     }
 
-    let [tscode, _] = tscodes[userInput];
+    if (userInput === '000') {
+      // generate yesterday file
+      Apis.generate({tscodes: (Object.values(tscodes) as string[][]).map((data: string[]) => data[0])}).then((botMessage: string) => {
+        thinking = Status.idle;
+        setchatHistory((prev) => [...prev, { role: Apis.Role.Assistant, content: botMessage }]);
+      }, (e: any) => { thinking = Status.error, alert(JSON.stringify(e)) })
+      return;
+    }
+
+    let name = userInput;
+    let customQuery: string|undefined = undefined;
+    let buy = true;
+
+    if (userInput.indexOf('+') > 0) {
+      // sell
+      let [a, b] = userInput.split('+');
+      name = a;
+      customQuery = b;
+      buy = false;
+    }
+
+    if (userInput.indexOf('#') > 0) {
+      let [a, b] = userInput.split('#');
+      name = a;
+      customQuery = b;
+    }
+    let [tscode, _] = tscodes[name];
     if (!tscode) {
       alert('股票找球不倒!');
       return;
     }
     const userMessage = { role: Apis.Role.User, content: `${userInput}` };
     const reqBody: Apis.ChatRequest = {
-      name: userInput,
+      name,
       tscode,
       vendor: selectedService,
-      buy: true,
+      buy,
       systemPrompt,
-      bankuai: `${bankuai}%`
+      bankuai: `${bankuai}%`,
+      customQuery
     }
 
     setchatHistory((prev) => [...prev, userMessage]);
@@ -209,7 +237,7 @@ const ChatBot: React.FC = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="input-form">
-          {/* New financing inputs */}
+          {/*}
           <div>
             <input
               type="string"
@@ -219,6 +247,7 @@ const ChatBot: React.FC = () => {
               placeholder="板块涨幅"
             />
           </div>
+          */}
 
           <input
             type="text"
@@ -227,8 +256,6 @@ const ChatBot: React.FC = () => {
             className="input-box"
             placeholder="股票名字"
           />
-          { /*
-          太占地方
           <select 
             value={selectedService}
             onChange={(e) => setSelectedService(e.target.value as Apis.Vendor)}
@@ -237,7 +264,6 @@ const ChatBot: React.FC = () => {
             <option value="siliconflow">SiliconFlow</option>
             <option value="deepseek">DeepSeek</option>
           </select>
-          */}
           <button type="submit" className="submit-button">
             Query
           </button>

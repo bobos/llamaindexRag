@@ -21,6 +21,7 @@ export interface ChatRequest {
   buy: boolean;
   systemPrompt: string;
   tscode: string;
+  customQuery?: string;
 }
 
 export async function chat(request: ChatRequest): Promise<string> {
@@ -36,6 +37,24 @@ export async function chat(request: ChatRequest): Promise<string> {
 
   try {
     return rsp.result;
+  } catch (e) {
+    throw e;
+  }
+}
+
+export async function generate(request: {tscodes: string[]}): Promise<string> {
+  console.log('send');
+  const response = await fetch('/yesterdayFile', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json', // Send as JSON
+    },
+    body: JSON.stringify(request)
+  });
+  await response.json();
+
+  try {
+    return '完成';
   } catch (e) {
     throw e;
   }
