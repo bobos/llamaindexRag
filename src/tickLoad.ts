@@ -12,35 +12,19 @@ export function getYesterdayFile(tsCode: string): string {
   return `/project/${tsCode}_yesterday_quote.txt`;
 }
 
+export function getYesterdayBeforeFile(tsCode: string): string {
+  return `/project/${tsCode}_yesterday_b4_quote.txt`;
+}
+
 function getYesterdayMarginFile(tsCode: string): string {
   return `/project/${tsCode}_yesterday_margin.txt`;
 }
 
-export async function loadTick(tsCode: string, charLimit: number = 15000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    fs.readFile(getFile(tsCode), 'utf8', (err, data) => {
-      if (err) {
-        return reject(err);
-      }
-
-      const lines = data.split('\n').reverse(); // 从最后一行开始
-      let totalChars = 0;
-      const collectedLines: string[] = [];
-
-      for (const line of lines) {
-        totalChars += line.length + 1; // 包含换行符
-        collectedLines.push(line);
-        if (totalChars > charLimit) {
-          break;
-        }
-      }
-
-      resolve(collectedLines.join('\n'));
-    });
-  });
+function getYesterdayBeforeMarginFile(tsCode: string): string {
+  return `/project/${tsCode}_yesterday_b4_margin.txt`;
 }
 
-export async function getTickString(lines: string[], charLimit: number = 30000): Promise<string> {
+export async function getTickString(lines: string[], charLimit: number = 15000): Promise<string> {
   let totalChars = 0;
   const collectedLines: string[] = [];
 
@@ -81,6 +65,18 @@ export async function loadYesterdayData(tsCode: string): Promise<string> {
   });
 }
 
+export async function loadYesterdayB4Data(tsCode: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    fs.readFile(getYesterdayBeforeFile(tsCode), 'utf8', (err, data) => {
+      if (err) {
+        return reject(err);
+      }
+
+      resolve(data);
+    });
+  });
+}
+
 export async function loadYesterdayMargin(tsCode: string): Promise<string> {
   return new Promise((resolve, reject) => {
     fs.readFile(getYesterdayMarginFile(tsCode), 'utf8', (err, data) => {
@@ -93,10 +89,24 @@ export async function loadYesterdayMargin(tsCode: string): Promise<string> {
   });
 }
 
+export async function loadYesterdayB4Margin(tsCode: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    fs.readFile(getYesterdayBeforeMarginFile(tsCode), 'utf8', (err, data) => {
+      if (err) {
+        return reject(err);
+      }
+
+      resolve(data);
+    });
+  });
+}
+
 export async function generateYesterdayFile(tscode: string): Promise<void> {
+  await pfs.copyFile(getYesterdayFile(tscode), getYesterdayBeforeFile(tscode));
+  await pfs.copyFile(getYesterdayMarginFile(tscode), getYesterdayBeforeMarginFile(tscode));
   await generateTickFile(tscode);
   await pfs.access(getFile(tscode));
-  const data = aggregateTickData(await loadAllTick(tscode), true);
+  const [data, _na] = aggregateTickData(await loadAllTick(tscode), true);
   await pfs.writeFile(getYesterdayFile(tscode), data);
   let [code, _] = tscode.split('.');
   await pfs.writeFile(getYesterdayMarginFile(tscode), await getMarginShort(code));
@@ -124,9 +134,19 @@ interface StatisticEntry {
   totalAmountOfNeutral: number;// 中性盘(N)总手数
   accQian: number;
   accShou: number;
+  under100Sell: number;
+  under100Buy: number;
+  from100To500Sell: number;
+  from100To500Buy: number;
+  from500To1000Sell: number;
+  from500To1000Buy: number;
+  from1000To5000Sell: number;
+  from1000To5000Buy: number;
+  over5000Sell: number;
+  over5000Buy: number;
 }
 
-export function aggregateTickData(lines: string[], downsample?: boolean): string {
+export function aggregateTickData(lines: string[], downsample?: boolean): string[] {
   const statsMap: { [key: string]: StatisticEntry } = {};
 
   let accQian = 0; //累计成交金额
@@ -135,8 +155,19 @@ export function aggregateTickData(lines: string[], downsample?: boolean): string
   // 处理时间转换（HH:MM:SS -> HH:MM:00）
   const toMinuteKey = (timeStr: string) => {
     let [h, m] = timeStr.split(':');
-    if (downsample) {
+    if (!downsample) {
       let min = parseInt(`${(parseInt(m)/5)}`)*5 + 5;
+      m = `${min}`;
+      if (min < 10) {
+        m = `0${min}`;
+      }
+      if (min === 60) {
+        m = '00';
+        let hour = parseInt(h) + 1; 
+        h = (hour < 10 ? '0' : '') + hour;
+      }
+    } else {
+      let min = parseInt(`${(parseInt(m)/15)}`)*15 + 15;
       m = `${min}`;
       if (min < 10) {
         m = `0${min}`;
@@ -171,7 +202,17 @@ export function aggregateTickData(lines: string[], downsample?: boolean): string
         totalAmountOfBuy: 0,
         totalAmountOfNeutral: 0,
         accQian: 0,
-        accShou: 0
+        accShou: 0,
+        under100Sell: 0,
+        under100Buy: 0,
+        from100To500Sell: 0,
+        from100To500Buy: 0,
+        from500To1000Sell: 0,
+        from500To1000Buy: 0,
+        from1000To5000Sell: 0,
+        from1000To5000Buy: 0,
+        over5000Sell: 0,
+        over5000Buy: 0,
       };
     }
 
@@ -199,11 +240,32 @@ export function aggregateTickData(lines: string[], downsample?: boolean): string
       default:
         console.warn(`Unknown transaction direction: ${direction}`);
     }
+
+    if (direction === 'N') {
+      continue;
+    }
+
+    if (volume < 100) {
+      direction === 'S' ? entry.under100Sell++ : entry.under100Buy++;
+    } else if (volume < 500) {
+      direction === 'S' ? entry.from100To500Sell++ : entry.from100To500Buy++;
+    } else if (volume < 1000) {
+      direction === 'S' ? entry.from500To1000Sell++ : entry.from500To1000Buy++;
+    } else if (volume < 5000) {
+      direction === 'S' ? entry.from1000To5000Sell++ : entry.from1000To5000Buy++;
+    } else {
+      direction === 'S' ? entry.over5000Sell++ : entry.over5000Buy++;
+    }
   }
 
   const statsArray = Object.values(statsMap).map((record: StatisticEntry) => { return {...record, avg: (record.accQian / record.accShou).toFixed(2)} });
-  return (downsample ? '时间,现价(元),分时均价(元),五分钟内总成交数(手),五分钟内总成交金额(元),五分钟内买盘成交数(手),五分钟内卖盘成交数(手)\n' : '时间,现价(元),分时均价(元),一分钟内总成交数(手),一分钟内总成交金额(元),一分钟内买盘成交数(手),一分钟内卖盘成交数(手)\n') +
-    statsArray.sort((a, b) => a.time.localeCompare(b.time)).map((record: StatisticEntry) => `${record.time},${record.price},${record.avg},${record.totalAmount},${Math.round(record.totalVal)},${record.totalAmountOfBuy},${record.totalAmountOfSell}`).join('\n');
+  let interval = downsample ? 15 : 5;
+  return [ 
+  `时间,现价(元),分时均价(元),${interval}分钟内总成交数(手),${interval}分钟内总成交金额(元),${interval}分钟内买盘成交数(手),${interval}分钟内卖盘成交数(手)\n` +
+    statsArray.sort((a, b) => a.time.localeCompare(b.time)).map((record: StatisticEntry) => `${record.time},${record.price},${record.avg},${record.totalAmount},${Math.round(record.totalVal)},${record.totalAmountOfBuy},${record.totalAmountOfSell}`).join('\n'),
+  `时间,${interval}分钟内100手以下买盘成交次数,${interval}分钟内100手以下卖盘成交次数,${interval}分钟内100至500手买盘成交次数,${interval}分钟内100至500手卖盘成交次数,${interval}分钟内500手至1000手买盘成交次数,${interval}分钟内500手至1000手卖盘成交次数,${interval}分钟内1000手至5000手买盘成交次数,${interval}分钟内1000手至5000手卖盘成交次数,${interval}分钟内5000手以上买盘成交次数,${interval}分钟内5000手以上卖盘成交次数\n` +
+    statsArray.sort((a, b) => a.time.localeCompare(b.time)).map((record: StatisticEntry) => `${record.time},${record.under100Buy},${record.under100Sell},${record.from100To500Buy},${record.from100To500Sell},${record.from500To1000Buy},${record.from500To1000Sell},${record.from1000To5000Buy},${record.from1000To5000Sell},${record.over5000Buy},${record.over5000Sell}`).join('\n'),
+  ]
 }
 
 export async function getMarginShort(tscode: string): Promise<string> {

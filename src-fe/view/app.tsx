@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './app.css';
 import * as Apis from '../integration/apis';
+import ReactMarkdown from 'react-markdown';
 
 const tscodes: any = {
   '宝信软件': ['600845.SH', '3.12'],
@@ -51,7 +52,7 @@ enum Status {
   error
 }
 
-const defaultPrompt = "你是资深的A股超短线投资客,帮助用户提供A股投资建议,回答中包含盘面趋势(做多为主|做空为主|多空存在分歧),所有回答请控制在250字以内.";
+const defaultPrompt = "你是资深的A股超短线投资客,帮助用户提供A股投资建议,回答中包含盘面趋势(做多为主|做空为主|多空存在分歧).";
 let thinking = Status.idle;
 const ChatBot: React.FC = () => {
   const [userInput, setUserInput] = useState(() => {
@@ -224,7 +225,9 @@ const ChatBot: React.FC = () => {
               {message.role === Apis.Role.Assistant ?
                 <div className="message-line">
                   <div className="icon-background" />
-                  <div className="assistant-text-area" style={{ textAlign: 'left' }} dangerouslySetInnerHTML={{ __html: message.content }} />
+                  <div className="assistant-text-area" style={{ textAlign: 'left' }} >
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                   </div>
                 </div> :
                 <div className="message-line text-right">
                   <div className="text-area">

@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import axios from 'axios';
-import { aggregateTickData, getFile, getMarginShort, getTickString, loadAllTick, loadQuote, loadTick, loadYesterdayData, loadYesterdayMargin } from "./tickLoad";
+import { aggregateTickData, getFile, getMarginShort, getTickString, loadAllTick, loadQuote, loadYesterdayB4Data, loadYesterdayB4Margin, loadYesterdayData, loadYesterdayMargin } from "./tickLoad";
 import * as fs from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -65,6 +65,7 @@ interface BaseStockData {
   shizhi: string;
   runzirunquan: string;
   yesterdayMargin: string;
+  yesterdayB4Margin: string;
 }
 
 interface StockData extends BaseStockData {
@@ -88,6 +89,7 @@ async function fetchStockData(tscode: string): Promise<BaseStockData> {
       shizhi: `${ret[45]}亿`,
       runzirunquan: await getMarginShort(code),
       yesterdayMargin: await loadYesterdayMargin(tscode),
+      yesterdayB4Margin: await loadYesterdayB4Margin(tscode),
     }
   } catch (error) {
     console.error('Error fetching stock data:', error);
@@ -96,27 +98,27 @@ async function fetchStockData(tscode: string): Promise<BaseStockData> {
 }
 
 async function quoteDataAnalyze(buy: boolean, vendor: Vendor, systemPrompt: string, sd: StockData, customQuery?: string): Promise<string> {
-  //const quoteData = await loadQuote(req.tsCode);
   const lines = await loadAllTick(sd.tscode);
-  const quoteData = await aggregateTickData(lines);
+  const [quoteData, ticks] = await aggregateTickData(lines);
   const yesterdayQuote = await loadYesterdayData(sd.tscode);
+  const yesterdayB4Quote = await loadYesterdayB4Data(sd.tscode);
   const query = !buy ? `该股买入价为${customQuery},给出该股当日止盈止损建议.` : (customQuery || '该股今日可建底仓吗?');
   return await deepThink(vendor, [
     { role: Role.System, content: systemPrompt },
-    { role: Role.User, content: `严格基于如下数据不要捏造任何数据,通过你的量化模型严谨计算,回答超短线投资者的问题:${query}\n--------------------------------------\n1.该股概况:\n${initPrompt(sd)}\n--------------------------------------\n2.该股当日分时明细:\n${quoteData}\n--------------------------------------\n3.该股昨日分时明细:\n${yesterdayQuote}\n--------------------------------------\n4.该股最近分笔成交明细:\n时间,价格,成交量,成交类型(B买盘/S卖盘/中性盘N)\n${getTickString(lines)}` }
+    { role: Role.User, content: `严格基于如下数据不要捏造任何数据,通过你的量化模型严谨计算,回答超短线投资者的问题:${query}\n1.该股概况:\n${initPrompt(sd)}\n--------------------------------------\n2.该股前日15分时明细:\n${yesterdayB4Quote}\n--------------------------------------\n3.该股昨日15分时明细:\n${yesterdayQuote}\n--------------------------------------\n4.该股今日5分时明细:\n${quoteData}\n--------------------------------------\n5.该股今日5分时成交汇总:\n${ticks}` }
   ]);
 }
 
 function getResult(name: string, cache1: string, cache2?: string): string {
-  let ret = `<p>${name}:<br>${cache1}`;
+  let ret = `${name}:${cache1}`;
   if (cache2) {
-    ret = ret + '<br>第二结论:<br>' + cache2;
+    ret = ret + '第二结论:>' + cache2;
   }
-  return ret + '</p>';
+  return ret;
 }
 
 function initPrompt(sd: StockData): string {
-  return `股票:${sd.name},市值:${sd.shizhi},昨收:${sd.zuoshou},涨幅:${sd.zhangfu}\n当日融资融券数据:${sd.runzirunquan}\n昨日融资融券数据:${sd.yesterdayMargin}`;
+  return `股票:${sd.name},市值:${sd.shizhi},昨收:${sd.zuoshou},涨幅:${sd.zhangfu}\n前日融资融券数据:${sd.yesterdayB4Margin}\n昨日融资融券数据:${sd.yesterdayMargin}\n当日融资融券数据:${sd.runzirunquan}`;
 }
 
 export async function ask(chatRequest: ChatRequest): Promise<string> {
