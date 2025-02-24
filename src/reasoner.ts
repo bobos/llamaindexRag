@@ -112,7 +112,7 @@ async function quoteDataAnalyze(buy: boolean, vendor: Vendor, systemPrompt: stri
 function getResult(name: string, cache1: string, cache2?: string): string {
   let ret = `${name}:${cache1}`;
   if (cache2) {
-    ret = ret + '第二结论:>' + cache2;
+    ret = ret + '第二结论:' + cache2;
   }
   return ret;
 }

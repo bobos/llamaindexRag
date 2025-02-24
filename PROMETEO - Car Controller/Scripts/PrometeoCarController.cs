@@ -392,14 +392,14 @@ public class PrometeoCarController : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        if (gameManager == null || !isTarget)
+        if (gameManager == null)
         {
             return;
         }
 
         if (other.CompareTag(finishLineTag))
         {
-            gameManager.GameEnd(true);
+            gameManager.GameEnd(isTarget);
         }
     }
 
