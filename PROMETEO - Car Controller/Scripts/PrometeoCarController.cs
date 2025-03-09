@@ -24,8 +24,9 @@ public class PrometeoCarController : MonoBehaviour
     private TMP_Text targetText;
 
     //CAR SETUP
-      [SerializeField] private string finishLineTag = "finishLine";
+    [SerializeField] private string finishLineTag = "finishLine";
     public bool isTarget = false;
+   
       [Space(20)]
       //[Header("CAR SETUP")]
       [Space(10)]
@@ -166,6 +167,7 @@ public class PrometeoCarController : MonoBehaviour
     void Start()
     {
         isUnlock = isTarget;
+        
         //In this part, we set the 'carRigidbody' value with the Rigidbody attached to this
         //gameObject. Also, we define the center of mass of the car with the Vector3 given
         //in the inspector.
@@ -256,9 +258,7 @@ public class PrometeoCarController : MonoBehaviour
             Debug.LogWarning(ex);
           }
         }
-
     }
-
     private void Awake()
     {
         targetText = transform.Find("indicator").GetComponent<TMP_Text>();
@@ -527,8 +527,37 @@ public class PrometeoCarController : MonoBehaviour
     //ENGINE AND BRAKING METHODS
     //
 
+    private void ApplyMotorTorque(float torque){
+        frontLeftCollider.motorTorque = torque;
+        frontRightCollider.motorTorque = torque;
+        rearLeftCollider.motorTorque = torque;
+        rearRightCollider.motorTorque = torque;
+    }
+
     // This method apply positive torque to the wheels in order to go forward.
-    public void GoForward(){
+    public void GoForward() {
+        // 重置油门轴，避免反向扭矩残留
+        if (throttleAxis < 0)
+        {
+            throttleAxis = 0;
+        }
+
+        throttleAxis += Time.deltaTime * 3f;
+        throttleAxis = Mathf.Min(throttleAxis, 1f);
+
+        // 检测到任何倒车速度时立即刹车
+        if (localVelocityZ < 0f){
+            Brakes();
+        } else {
+            // 应用前进扭矩
+            if (Mathf.RoundToInt(carSpeed) < maxSpeed){
+                ApplyMotorTorque(accelerationMultiplier * 50f * throttleAxis);
+            } else {
+                ApplyMotorTorque(0);
+            }
+        }
+         // New code ended
+
       //If the forces aplied to the rigidbody in the 'x' asis are greater than
       //3f, it means that the car is losing traction, then the car will start emitting particle systems.
       if(Mathf.Abs(localVelocityX) > 2.5f){
@@ -573,6 +602,26 @@ public class PrometeoCarController : MonoBehaviour
 
     // This method apply negative torque to the wheels in order to go backwards.
     public void GoReverse(){
+      // 重置油门轴
+        if (throttleAxis > 0)
+            throttleAxis = 0;
+
+        throttleAxis -= Time.deltaTime * 3f;
+        throttleAxis = Mathf.Max(throttleAxis, -1f);
+
+        // 检测到任何前进速度时刹车
+        if (localVelocityZ > 0f){
+            Brakes();
+        } else {
+            // 应用倒车扭矩
+            if (Mathf.Abs(carSpeed) < maxReverseSpeed){
+                ApplyMotorTorque(accelerationMultiplier * 50f * throttleAxis);
+            } else {
+                ApplyMotorTorque(0);
+            }
+        }
+        // new code ended
+
       //If the forces aplied to the rigidbody in the 'x' asis are greater than
       //3f, it means that the car is losing traction, then the car will start emitting particle systems.
       if(Mathf.Abs(localVelocityX) > 2.5f){

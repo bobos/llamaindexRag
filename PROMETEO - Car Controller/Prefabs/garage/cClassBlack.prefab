@@ -584,9 +584,9 @@ MonoBehaviour:
   isTarget: 0
   maxSpeed: 50
   maxReverseSpeed: 18
-  accelerationMultiplier: 6
-  maxSteeringAngle: 25
-  steeringSpeed: 0.5
+  accelerationMultiplier: 4
+  maxSteeringAngle: 24
+  steeringSpeed: 0.3
   brakeForce: 450
   decelerationMultiplier: 10
   handbrakeDriftMultiplier: 5
@@ -826,8 +826,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.8488209, y: 1.3085461, z: 4.5909824}
-  m_Center: {x: 0, y: 0.31476465, z: 0.062282912}
+  m_Size: {x: 1.7603637, y: 1.3085461, z: 4.5588226}
+  m_Center: {x: 0.016084015, y: 0.31476462, z: 0.0703094}
 --- !u!1 &8394941308225588920
 GameObject:
   m_ObjectHideFlags: 0

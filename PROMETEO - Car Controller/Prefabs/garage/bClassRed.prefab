@@ -112,10 +112,10 @@ MonoBehaviour:
   finishLineTag: finishLine
   isTarget: 0
   maxSpeed: 50
-  maxReverseSpeed: 18
-  accelerationMultiplier: 6
-  maxSteeringAngle: 30
-  steeringSpeed: 0.6
+  maxReverseSpeed: 15
+  accelerationMultiplier: 4
+  maxSteeringAngle: 25
+  steeringSpeed: 0.3
   brakeForce: 450
   decelerationMultiplier: 10
   handbrakeDriftMultiplier: 5
@@ -371,8 +371,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1.6049931, y: 1.117715, z: 3.8588455}
-  m_Center: {x: 0.00000023841858, y: 0.39248386, z: 0.0049451585}
+  m_Size: {x: 1.5164462, y: 1.0752127, z: 3.7986336}
+  m_Center: {x: -0.0017708825, y: 0.4137353, z: 0.024425644}
 --- !u!1 &5225087856188573388
 GameObject:
   m_ObjectHideFlags: 0

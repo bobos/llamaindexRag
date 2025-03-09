@@ -1,40 +1,3 @@
-/*
-using UnityEngine;
-
-public class CameraSwitcher : MonoBehaviour
-{
-    public Camera[] cameras;  // 在Inspector中拖入所有需要切换的摄像机
-    private int currentCameraIndex = 0;
-
-    void Start()
-    {
-        // 初始时关闭所有摄像机，只启用第一个
-        for (int i = 0; i < cameras.Length; i++)
-        {
-            cameras[i].enabled = (i == 0);
-        }
-    }
-
-    void Update()
-    {
-        // 按数字键1/2/3切换摄像机（可自定义按键）
-        if (Input.GetKeyDown(KeyCode.Alpha1)) SwitchCamera(0);
-        if (Input.GetKeyDown(KeyCode.Alpha2)) SwitchCamera(1);
-        if (Input.GetKeyDown(KeyCode.Alpha3)) SwitchCamera(2);
-    }
-
-    public void SwitchCamera(int newIndex)
-    {
-        // 安全性检查
-        if (newIndex < 0 || newIndex >= cameras.Length) return;
-
-        // 关闭当前摄像机，启用新摄像机
-        cameras[currentCameraIndex].enabled = false;
-        cameras[newIndex].enabled = true;
-        currentCameraIndex = newIndex;
-    }
-}
-*/
 using UnityEngine;
 using System.Collections;
 
@@ -45,10 +8,11 @@ public class CameraSwitcherWithPool : MonoBehaviour
     private Coroutine disableCoroutine;
 
     private AdvancedMouseSelector carSelector;
-    private bool isCurrentMain = true;
+    private bool isCurrentMain = false;
     void Start()
     {
-        topCamera.gameObject.SetActive(false);
+        mainCamera.gameObject.SetActive(isCurrentMain);
+        topCamera.gameObject.SetActive(!isCurrentMain);
         carSelector = AdvancedMouseSelector.Instance;
     }
     void Update()

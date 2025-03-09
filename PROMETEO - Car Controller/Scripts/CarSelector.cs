@@ -7,17 +7,15 @@ public class AdvancedMouseSelector : MonoBehaviour
     [Header("基础设置")]
     [SerializeField] private LayerMask carMask;
     public string targetScriptName = "PrometeoCarController"; // 需要控制的脚本名称
-    public string lidarScriptName = "CameraFollow"; // 需要控制的脚本名称
-    public string lidarParentName = "lidars";
     public Camera topCamera;
+    public Camera mainCamera;
 
     private bool isSelected = false;
-    private Camera mainCamera;
     private Transform currentParent;       // 当前缓存的父对象
-    private MonoBehaviour currentScript;   // 当前缓存的脚本
-    private List<MonoBehaviour> lidarScripts = new List<MonoBehaviour>(); // 缓存lidar脚本
+    private PrometeoCarController currentScript;   // 当前缓存的脚本
     private GameManager gameManager;
 
+    List<LidarController> lidarScripts = new List<LidarController>();
     public static AdvancedMouseSelector Instance { get; private set; }
 
     void Awake()
@@ -33,7 +31,6 @@ public class AdvancedMouseSelector : MonoBehaviour
     }
     void Start()
     {
-        mainCamera = Camera.main;
         gameManager = GameManager.Instance;
         CacheLidarScripts();
     }
@@ -42,14 +39,15 @@ public class AdvancedMouseSelector : MonoBehaviour
     {
         return isSelected;
     }
+
     void CacheLidarScripts()
     {
-        GameObject lidarParent = GameObject.Find(lidarParentName);
+        GameObject lidarParent = GameObject.Find("lidars"); //找到全局game object by name
         if (lidarParent != null)
         {
             foreach (Transform child in lidarParent.transform)
             {
-                MonoBehaviour script = child.GetComponent(lidarScriptName) as MonoBehaviour;
+                LidarController script = child.GetComponent<LidarController>();
                 if (script != null)
                 {
                     lidarScripts.Add(script);
@@ -58,7 +56,7 @@ public class AdvancedMouseSelector : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"未找到Lidar父物体: {lidarParentName}");
+            Debug.LogError($"未找到Lidar父物体");
         }
     }
 
@@ -95,8 +93,9 @@ public class AdvancedMouseSelector : MonoBehaviour
                     }
                     script.EnableIndicator();
                 }
+                currentParent = newParent;
                 DisablePreviousScriptWithClear(); // 禁用前调用Clear
-                CacheAndEnableNewScript(newParent);
+                CacheAndEnableNewScript(script);
                 AssignToAllCarTransforms(newParent); // 同步所有关联脚本
             }
         }
@@ -110,15 +109,8 @@ public class AdvancedMouseSelector : MonoBehaviour
     {
         if (currentScript != null)
         {
-            // 反射调用Clear方法
-            MethodInfo clearMethod = currentScript.GetType().GetMethod("Clear");
-            if (clearMethod != null)
-            {
-                clearMethod.Invoke(currentScript, null);
-                Debug.Log($"已调用Clear方法: {currentScript.GetType().Name}");
-            }
-
-            currentScript.enabled = false;
+           currentScript.Clear();
+           currentScript.enabled = false;
         }
     }
 
@@ -128,20 +120,11 @@ public class AdvancedMouseSelector : MonoBehaviour
         CameraFollow cameraFollow = mainCamera.GetComponent<CameraFollow>();
         if (cameraFollow != null) cameraFollow.carTransform = target;
 
-        // 更新所有lidar脚本
-        foreach (MonoBehaviour script in lidarScripts)
+        foreach (LidarController script in lidarScripts)
         {
-            if (script != null)
-            {
-                // 使用反射设置字段值
-                FieldInfo field = script.GetType().GetField("carTransform");
-                if (field != null)
-                {
-                    field.SetValue(script, target);
-                }
-            }
+            script.carTransform = target;
+            script.StartCheck();
         }
-        Debug.Log($"已同步{lidarScripts.Count}个Lidar脚本的carTransform");
     }
     
     Transform GetTopParent(Transform child)
@@ -162,11 +145,10 @@ public class AdvancedMouseSelector : MonoBehaviour
         }
     }
 
-    void CacheAndEnableNewScript(Transform parent)
+    void CacheAndEnableNewScript(PrometeoCarController newScript)
     {
         isSelected = true;
-        currentParent = parent;
-        currentScript = parent.GetComponent(targetScriptName) as MonoBehaviour;
+        currentScript = newScript;
 
         if (currentScript != null)
         {
@@ -175,7 +157,7 @@ public class AdvancedMouseSelector : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"父物体 {parent.name} 上未找到脚本: {targetScriptName}");
+            Debug.LogError($"未找到脚本: {targetScriptName}");
         }
     }
 
@@ -185,6 +167,10 @@ public class AdvancedMouseSelector : MonoBehaviour
         DisablePreviousScript();
         currentParent = null;
         currentScript = null;
+        foreach (LidarController script in lidarScripts)
+        {
+            script.StopCheck();
+        }
     }
 
     // 安全清理（场景切换时调用）
