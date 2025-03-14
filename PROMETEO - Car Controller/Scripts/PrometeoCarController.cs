@@ -20,9 +20,6 @@ public class PrometeoCarController : MonoBehaviour
 {
     private bool isUnlock = false;
 
-    public GameObject indicator;
-    private TMP_Text targetText;
-
     //CAR SETUP
     [SerializeField] private string finishLineTag = "finishLine";
     public bool isTarget = false;
@@ -257,21 +254,6 @@ public class PrometeoCarController : MonoBehaviour
             " PrometeoCarController component.";
             Debug.LogWarning(ex);
           }
-        }
-    }
-    private void Awake()
-    {
-        targetText = transform.Find("indicator").GetComponent<TMP_Text>();
-        if (isTarget) EnableIndicator();
-    }
-
-    public void EnableIndicator()
-    {
-        isUnlock = true;
-        indicator.SetActive(true);
-        if(isTarget)
-        {
-            targetText.color = Color.red;
         }
     }
 

@@ -91,7 +91,6 @@ public class AdvancedMouseSelector : MonoBehaviour
                     {
                         return;
                     }
-                    script.EnableIndicator();
                 }
                 currentParent = newParent;
                 DisablePreviousScriptWithClear(); // 禁用前调用Clear
