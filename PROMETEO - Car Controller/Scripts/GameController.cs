@@ -1,5 +1,3 @@
-using NUnit.Framework;
-using System;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;

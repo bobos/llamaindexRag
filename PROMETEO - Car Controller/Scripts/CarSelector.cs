@@ -3,26 +3,27 @@ using System.Collections.Generic;
 
 public class AdvancedMouseSelector : MonoBehaviour
 {
-    [Header("»ù´¡ÉèÖÃ")]
+    [Header("åŸºç¡€è®¾ç½®")]
     [SerializeField] private LayerMask carMask;
-    public string targetScriptName = "PrometeoCarController"; // ĞèÒª¿ØÖÆµÄ½Å±¾Ãû³Æ
+    public string targetScriptName = "PrometeoCarController"; // éœ€è¦æ§åˆ¶çš„è„šæœ¬åç§°
     public Camera topCamera;
     public Camera mainCamera;
-    public LayerMask obstacleLayer;    // ÕÏ°­ÎïËùÔÚ²ã
-    public float zoomSpeed = 3f;       // Ëõ·ÅËÙ¶È
-    public float rotateSpeed = 2f;   // Ğı×ªËÙ¶È
+    public LayerMask obstacleLayer;    // éšœç¢ç‰©æ‰€åœ¨å±‚
+    public float zoomSpeed = 3f;       // ç¼©æ”¾é€Ÿåº¦
+    public float rotateSpeed = 2f;   // æ—‹è½¬é€Ÿåº¦
+    public Transform car;
     
-    private float originalZScale;     // ³õÊ¼ZÖá³ß´ç
-    private Vector3 lastMousePosition; // ÓÃÓÚ¼ÆËãÊó±êÎ»ÒÆ
-    private GameObject currentObstacle; // µ±Ç°Ñ¡ÖĞµÄÕÏ°­Îï
-    private bool isDragging = false;    // ÍÏ×§×´Ì¬±ê¼Ç
-    private Vector3 offset;             // µã»÷Î»ÖÃÓëÎïÌåÖĞĞÄµÄÆ«ÒÆÁ¿
-    private float groundZ = 0;          // µØÃæZ×ø±ê£¨¸ù¾İÊµ¼ÊÇé¿öµ÷Õû£©
+    private float originalZScale;     // åˆå§‹Zè½´å°ºå¯¸
+    private Vector3 lastMousePosition; // ç”¨äºè®¡ç®—é¼ æ ‡ä½ç§»
+    private Transform currentObstacle; // å½“å‰é€‰ä¸­
+    private bool isDragging = false;    // æ‹–æ‹½çŠ¶æ€æ ‡è®°
+    private Vector3 offset;             // ç‚¹å‡»ä½ç½®ä¸ç‰©ä½“ä¸­å¿ƒçš„åç§»é‡
+    private float groundZ = 0;          // åœ°é¢Zåæ ‡ï¼ˆæ ¹æ®å®é™…æƒ…å†µè°ƒæ•´ï¼‰
 
-    private bool isSelected = false;
-    private Transform currentParent;       // µ±Ç°»º´æµÄ¸¸¶ÔÏó
-    private PrometeoCarController currentScript;   // µ±Ç°»º´æµÄ½Å±¾
+    private bool isCarSelected = false;
+    private bool driveMode = false;
     private GameManager gameManager;
+    private PrometeoCarController carScript;
 
     List<LidarController> lidarScripts = new List<LidarController>();
     public static AdvancedMouseSelector Instance { get; private set; }
@@ -42,16 +43,18 @@ public class AdvancedMouseSelector : MonoBehaviour
     {
         gameManager = GameManager.Instance;
         CacheLidarScripts();
+        carScript = car.GetComponent<PrometeoCarController>();
+        carScript.enabled = false;
     }
 
     public bool IsSelected()
     {
-        return isSelected;
+        return driveMode;
     }
 
     void CacheLidarScripts()
     {
-        GameObject lidarParent = GameObject.Find("lidars"); //ÕÒµ½È«¾Ögame object by name
+        GameObject lidarParent = GameObject.Find("lidars"); //æ‰¾åˆ°å…¨å±€game object by name
         if (lidarParent != null)
         {
             foreach (Transform child in lidarParent.transform)
@@ -59,84 +62,72 @@ public class AdvancedMouseSelector : MonoBehaviour
                 LidarController script = child.GetComponent<LidarController>();
                 if (script != null)
                 {
+                    script.carTransform = car;
                     lidarScripts.Add(script);
                 }
             }
         }
         else
         {
-            Debug.LogError($"Î´ÕÒµ½Lidar¸¸ÎïÌå");
+            Debug.LogError($"æœªæ‰¾åˆ°Lidarçˆ¶ç‰©ä½“");
         }
     }
 
     void Update()
     {
-        if (!gameManager.IsActive())
+        if (!gameManager.IsActive() || driveMode)
         {
-            ClearAll();
             return;
         }
         HandleRotation();
-        // ³ÖĞøÍÏ×§
+        HandleDragging();
+         // ç»“æŸæ“ä½œ
+        if (Input.GetMouseButtonUp(0) || Input.GetMouseButtonUp(1))
+        {
+            DeselectObject();
+        }
+
+        // æŒç»­æ‹–æ‹½
         if (isDragging && Input.GetMouseButton(0))
         {
             if (Input.GetMouseButton(0) && !Input.GetMouseButton(1) && currentObstacle != null)
             {
                 Vector3 newPosition = GetMouseWorldPosition() + offset;
-                newPosition.y = currentObstacle.transform.position.y; // Ëø¶¨YÖá
-                currentObstacle.transform.position = newPosition;
+                newPosition.y = currentObstacle.position.y; // é”å®šYè½´
+                currentObstacle.position = newPosition;
 
-                // ¹öÂÖËõ·Å
+                // æ»šè½®ç¼©æ”¾
                 float scroll = Input.GetAxis("Mouse ScrollWheel");
-                if (scroll != 0)
+                if (scroll != 0 && !isCarSelected)
                 {
-                    Vector3 newScale = currentObstacle.transform.localScale;
+                    Vector3 newScale = currentObstacle.localScale;
                     newScale.z = Mathf.Clamp(
                         newScale.z + scroll * zoomSpeed,
                         originalZScale / 6f,
                         originalZScale * 4f
                     );
-                    currentObstacle.transform.localScale = newScale;
+                    currentObstacle.localScale = newScale;
                 }
             }
-        }
-
-        // ½áÊøÍÏ×§
-        if (Input.GetMouseButtonUp(0))
-        {
-            isDragging = false;
-            currentObstacle = null;
-        }
-
-        if (Input.GetMouseButtonDown(0))
-        {
-            HandleSelection();
         }
     }
 
     void HandleRotation()
     {
-        // ÓÒ¼ü°´ÏÂÊ±Ñ¡ÔñÎïÌå
-        if (Input.GetMouseButtonDown(1))
+        // å³é”®æŒ‰ä¸‹æ—¶é€‰æ‹©ç‰©ä½“
+        if (Input.GetMouseButtonDown(1) && HandleSelection())
         {
-            RaycastHit hit;
-            Ray ray = topCamera.ScreenPointToRay(Input.mousePosition);
-
-            if (Physics.Raycast(ray, out hit, Mathf.Infinity, obstacleLayer))
-            {
-                currentObstacle = hit.collider.gameObject;
-                lastMousePosition = Input.mousePosition;
-            }
+            lastMousePosition = Input.mousePosition;
         }
 
-        // °´×¡ÓÒ¼üĞı×ª
+        // æŒ‰ä½å³é”®æ—‹è½¬
         if (Input.GetMouseButton(1) && currentObstacle != null)
         {
-            // ¼ÆËãË®Æ½Î»ÒÆ²î
+            // è®¡ç®—æ°´å¹³ä½ç§»å·®
             float mouseDelta = (Input.mousePosition.x - lastMousePosition.x) * 0.1f;
             
-            // Ó¦ÓÃĞı×ª£¨¸üÂıµÄËÙ¶È£©
-            currentObstacle.transform.Rotate(
+            // åº”ç”¨æ—‹è½¬ï¼ˆæ›´æ…¢çš„é€Ÿåº¦ï¼‰
+            currentObstacle.Rotate(
                 0, 
                 mouseDelta * rotateSpeed, 
                 0,
@@ -145,58 +136,73 @@ public class AdvancedMouseSelector : MonoBehaviour
         }
         lastMousePosition = Input.mousePosition;
     }
-    void HandleSelection()
+
+    void HandleDragging()
+    {
+        if (!Input.GetMouseButtonDown(0)) { return; }
+
+        if (HandleSelection())
+        {
+            isDragging = true;
+            // è®¡ç®—åç§»é‡ï¼ˆä¸–ç•Œåæ ‡ï¼‰
+            offset = currentObstacle.position - GetMouseWorldPosition();
+            // è®°å½•åˆå§‹æ•°æ®
+            originalZScale = currentObstacle.localScale.z;
+            lastMousePosition = Input.mousePosition;
+        }
+    }
+
+    bool HandleSelection()
     {   
-        Camera camera = mainCamera.isActiveAndEnabled ? mainCamera : topCamera;
-        Ray ray = camera.ScreenPointToRay(Input.mousePosition);
+        Ray ray = topCamera.ScreenPointToRay(Input.mousePosition);
         RaycastHit hit;
 
-        //if (Physics.Raycast(ray, out hit, Mathf.Infinity, (1 << carMask) | (1 << obstacleLayer)))
-        if (Physics.Raycast(ray, out hit, Mathf.Infinity,  obstacleLayer|carMask))
+        if (Physics.Raycast(ray, out hit, Mathf.Infinity, obstacleLayer | carMask))
         {
-            if (isSelected) { return; }
             if (isInLayerMask(hit.collider.gameObject.layer, carMask.value))
             {
                 Debug.Log("car selected");
+                isCarSelected = true;
                 Transform newParent = GetTopParent(hit.collider.transform);
-                if (newParent != null && newParent != currentParent)
-                {
-                    PrometeoCarController script = newParent.GetComponent<PrometeoCarController>();
-                    if (!script.IsUnlocked())
-                    {
-                        if (!gameManager.UseCarKey(script.GetInstanceID()))
-                        {
-                            return;
-                        }
-                    }
-                    currentParent = newParent;
-                    DisablePreviousScriptWithClear(); // ½ûÓÃÇ°µ÷ÓÃClear
-                    CacheAndEnableNewScript(script);
-                    AssignToAllCarTransforms(newParent); // Í¬²½ËùÓĞ¹ØÁª½Å±¾
-                }
-            } else {
-                Debug.Log("obstacle selected");
-                currentObstacle = hit.collider.gameObject;
-                isDragging = true;
-
-                // ¼ÆËãÆ«ÒÆÁ¿£¨ÊÀ½ç×ø±ê£©
-                offset = currentObstacle.transform.position - GetMouseWorldPosition();
-                // ¼ÇÂ¼³õÊ¼Êı¾İ
-                originalZScale = currentObstacle.transform.localScale.z;
-                lastMousePosition = Input.mousePosition;
+                SelectObject(newParent);
             }
-        } else { 
-            ClearAll();
+            else
+            {
+                Debug.Log("obstacle selected");
+                isCarSelected = false;
+                SelectObject(hit.collider.transform);
+            }
+            return true;
+        } else
+        {
+            return false;
         }
     }
+
+    void DeselectObject()
+    {
+        if(currentObstacle != null && !isCarSelected)
+        {
+            currentObstacle.GetComponent<SelectedEffect>().Deselect();
+        }
+        currentObstacle = null;
+        isDragging = false;
+    }
+    void SelectObject(Transform obj)
+    {
+        // è®¾ç½®æ–°é€‰æ‹©
+        currentObstacle = obj;
+        if (!isCarSelected) currentObstacle.GetComponent<SelectedEffect>().Select();
+    }
+
     bool isInLayerMask(int layer, LayerMask layerMask)
     {
         return (layerMask.value & (1 << layer)) != 0;
     }
-    // »ñÈ¡Êó±êÔÚÊÀ½ç¿Õ¼äÖĞµÄÎ»ÖÃ£¨XZÆ½Ãæ£©
+    // è·å–é¼ æ ‡åœ¨ä¸–ç•Œç©ºé—´ä¸­çš„ä½ç½®ï¼ˆXZå¹³é¢ï¼‰
     private Vector3 GetMouseWorldPosition()
     {
-        Plane plane = new Plane(Vector3.up, Vector3.up * groundZ); // XZÆ½Ãæ
+        Plane plane = new Plane(Vector3.up, Vector3.up * groundZ); // XZå¹³é¢
         Ray ray = topCamera.ScreenPointToRay(Input.mousePosition);
         
         if (plane.Raycast(ray, out float distance))
@@ -204,28 +210,6 @@ public class AdvancedMouseSelector : MonoBehaviour
             return ray.GetPoint(distance);
         }
         return Vector3.zero;
-    }
-
-    void DisablePreviousScriptWithClear()
-    {
-        if (currentScript != null)
-        {
-           currentScript.Clear();
-           currentScript.enabled = false;
-        }
-    }
-
-    void AssignToAllCarTransforms(Transform target)
-    {
-        // ¸üĞÂÖ÷ÉãÏñ»ú
-        CameraFollow cameraFollow = mainCamera.GetComponent<CameraFollow>();
-        if (cameraFollow != null) cameraFollow.carTransform = target;
-
-        foreach (LidarController script in lidarScripts)
-        {
-            script.carTransform = target;
-            script.StartCheck();
-        }
     }
     
     Transform GetTopParent(Transform child)
@@ -237,46 +221,30 @@ public class AdvancedMouseSelector : MonoBehaviour
         return child;
     }
 
-    void DisablePreviousScript()
+    public void EnterDriveMode()
     {
-        if (currentScript != null)
-        {
-            currentScript.enabled = false;
-            Debug.Log($"ÒÑ½ûÓÃ½Å±¾: {currentScript.GetType().Name}");
-        }
-    }
+        carScript.enabled = true;
+        driveMode = true;
+        // æ›´æ–°ä¸»æ‘„åƒæœº
+        CameraFollow cameraFollow = mainCamera.GetComponent<CameraFollow>();
+        if (cameraFollow != null) cameraFollow.carTransform = car;
 
-    void CacheAndEnableNewScript(PrometeoCarController newScript)
-    {
-        isSelected = true;
-        currentScript = newScript;
-
-        if (currentScript != null)
-        {
-            currentScript.enabled = true;
-            Debug.Log($"ÒÑÆôÓÃ½Å±¾: {currentScript.GetType().Name}");
-        }
-        else
-        {
-            Debug.LogError($"Î´ÕÒµ½½Å±¾: {targetScriptName}");
-        }
-    }
-
-    void ClearAll()
-    {
-        isSelected = false;
-        DisablePreviousScript();
-        currentParent = null;
-        currentScript = null;
         foreach (LidarController script in lidarScripts)
         {
-            script.StopCheck();
+            script.StartCheck();
         }
     }
 
-    // °²È«ÇåÀí£¨³¡¾°ÇĞ»»Ê±µ÷ÓÃ£©
-    void OnDestroy()
+    public void EnterEditorMode()
     {
-        ClearAll();
+        driveMode = false;
+        carScript.enabled = false;
+        foreach (LidarController script in lidarScripts)
+        {
+            if (script != null)
+            {
+                script.StopCheck();
+            }
+        }
     }
 }
