@@ -10,4 +10,11 @@ services:
     command: ["/bin/bash"]
     hostname: example
     image: docker.io/node:18.17.0
-    depends_on: []
+    depends_on: [neo4j]
+  neo4j:
+    image: docker.io/neo4j:2025.02.0
+    ports:
+      - 7474:7474
+      - 7687:7687
+    environment:
+      NEO4J_AUTH: neo4j/admin123

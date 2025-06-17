@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>不叫驴</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+      font-size: xx-small;
+    }
+
+    body {
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      color: #333;
+      min-height: 100vh;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      color: white;
+    }
+
+    .header h1 {
+      font-size: 2.2rem;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .header p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+
+    .table-container {
+      text-align: center;
+      overflow-x: auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+      min-width: 600px;
+      margin: 0 auto;
+    }
+
+    thead {
+      background-color: #3f51b5;
+      color: white;
+    }
+
+    th,
+    td {
+      text-align: center;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    th {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    tbody tr:hover {
+      background-color: #f5f7ff;
+      transition: background-color 0.3s;
+    }
+
+    input.editable {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: #ffffe0;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    input.editable:focus {
+      border-color: #3f51b5;
+      box-shadow: 0 0 0 2px rgba(63, 81, 181, 0.2);
+    }
+
+    .delete-btn {
+      background-color: #ff4081;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.25s;
+    }
+
+    .delete-btn:hover {
+      background-color: #e91e63;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-cell {
+      text-align: center;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: center;
+      margin-top: 25px;
+    }
+
+    #submitBtn {
+      background: linear-gradient(to right, #3f51b5, #2196f3);
+      color: white;
+      border: none;
+      border-radius: 50px;
+      padding: 14px 45px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s;
+    }
+
+    #submitBtn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      background: linear-gradient(to right, #2196f3, #3f51b5);
+    }
+
+    #dataOutput {
+      background-color: rgba(255, 255, 255, 0.9);
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 30px;
+      font-family: monospace;
+      white-space: pre;
+      overflow: auto;
+      max-height: 200px;
+      display: none;
+    }
+
+    .instructions {
+      background-color: rgba(255, 255, 255, 0.15);
+      color: white;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+      font-size: 0.95rem;
+    }
+
+    .instructions h3 {
+      margin-bottom: 8px;
+      font-size: 1.1rem;
+    }
+
+    .instructions ul {
+      padding-left: 20px;
+    }
+
+    .instructions li {
+      margin: 5px 0;
+    }
+
+    /* 响应式设计 */
+    @media screen and (max-width: 768px) {
+
+      .table-container {
+        overflow-x: auto;
+      }
+
+      table {
+        min-width: 600px;
+      }
+
+
+      .header h1 {
+        font-size: 1.8rem;
+      }
+
+      .header p {
+        font-size: 1rem;
+      }
+    }
+
+    @media screen and (max-width: 480px) {
+      .footer {
+        justify-content: stretch;
+      }
+
+      #submitBtn {
+        width: 100%;
+        padding: 15px;
+        font-size: 1rem;
+      }
+
+      .header h1 {
+        font-size: 1.6rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="table-container">
+      <table id="dataTable">
+        <thead>
+          <tr>
+            <th>速度 - 耗电 - 离去 - 充电时长 - 计划充电至</th>
+            <th>设置充电目标(%)</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <!-- 数据行将由JavaScript动态生成 -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      <button id="submitBtn">安排</button>
+    </div>
+
+  </div>
+
+  <script>
+    const J2KwhFactor = 3.6e6;
+    function getDragEnergyKwh(velocity, distance, cd, af) {
+      const rho = 1.225;  //空气密度kg/m3
+      const v = velocity * 1000 / 3600; // km/h -> m/s
+      const d = distance * 1000;  // km -> m
+
+      const dragForce = 0.5 * rho * cd * af * v * v; //风阻
+      return (dragForce * d) / J2KwhFactor;  // J -> kwh
+    }
+
+    function getGravityEnergyKwh(distance, weight, altitudeDiff, eta) {
+      const massKg = weight * 1000;
+      const g = 9.8;
+      const d = distance *  1000;
+      const slope = altitudeDiff / d;
+      const slopeRad = Math.atan(slope);
+
+      const slopeForce = massKg * g * Math.sin(slopeRad);
+      const slopeEnergy = 1.65 * (slopeForce * d) / J2KwhFactor; // 16.5为经验值
+      return altitudeDiff >=0 ? slopeEnergy : slopeEnergy * eta;
+    }
+
+    function getConsumption(velocity, distance, altitudeDiff, weight = 2.07, energyBase = 17.5, velocityBase = 120, cd = 0.219, af = 2.2, eta = 0.35) {
+      //计算每百公里基线滚阻(减去风阻)
+      const distanceBase = 100;
+      const baseDragEnergy = getDragEnergyKwh(velocityBase, distanceBase, cd, af);
+      const rollingEnergy = energyBase - baseDragEnergy;
+
+      const actualRollingEnergy = rollingEnergy * distance / distanceBase;
+      const actualDragEnergy = getDragEnergyKwh(velocity, distance, cd, af);
+      const horizontal = actualDragEnergy + actualRollingEnergy;
+
+      return horizontal + getGravityEnergyKwh(distance, weight, altitudeDiff, eta);
+    }
+
+    let initialSoc = 1;
+    //const start = ["起点", 0, 24];
+    //let stops = [
+    //  start,
+    //  ["四会", 127, 24],
+    //  ["广宁", 142, 44],
+    //  ["怀城", 186, 85],
+    //  ["梁村", 218, 96],
+    //  ["白马", 244, 86],
+    //  ["大桂山", 262, 186],
+    //  ["贺州", 284, 151],
+    //  ["同古", 334, 186],
+    //  ["平乐", 396, 230],
+    //  ["高田", 432, 136],
+    //  ["东山", 456, 134],
+    //  ["会仙", 476, 147, 0.65],
+    //  ["桂林", 498, 180],
+    //  ["五通", 523, 270],
+    //  ["宛田", 548, 375],
+    //  ["龙胜", 576, 252],
+    //  ["三江北", 614, 190, 1],
+    //  ["肇兴", 648, 340, undefined, 110],
+    //  ["洛香", 674, 410, undefined, 110],
+    //  ["四格", 761, 710, undefined, 110],
+    //  ["天星桥", 813, 740, undefined, 110],
+    //  ["清水江", 826, 810, undefined, 110],
+    //  ["贵定天福", 886, 1042, undefined, 110],
+    //  ["龙洞堡", 933, 1120, undefined, 110],
+    //  ["永乐", 948, 1170, undefined, 110],
+    //  ["开阳", 998, 1110, undefined, 110],
+    //  ["双流", 1022, 1400, undefined, 66],
+    //]
+
+    const start = ["起点", 0, 24];
+    let stops = [
+      start,
+      ["四会", 127, 24],
+      ["广宁", 142, 44],
+      ["怀城", 186, 85],
+      ["梁村", 218, 96],
+      ["白马", 244, 86],
+      ["大桂山", 262, 186],
+      ["贺州", 284, 151],
+      ["同古", 334, 186],
+      ["平乐", 396, 230],
+      ["高田", 432, 136],
+      ["东山", 456, 134],
+      ["会仙", 476, 147, 0.65],
+      ["桂林", 498, 180],
+      ["五通", 523, 270],
+      ["宛田", 548, 375],
+      ["龙胜", 576, 252],
+      ["三江北", 614, 190, 1],
+      ["肇兴", 648, 340, undefined, 110],
+      ["洛香", 674, 410, undefined, 110],
+      ["四格", 761, 710, undefined, 110],
+      ["天星桥", 813, 740, undefined, 110],
+      ["清水江", 826, 810, undefined, 110],
+      ["贵定天福", 886, 1042, undefined, 110],
+      ["龙洞堡", 933, 1120, undefined, 110],
+      ["永乐", 948, 1170, undefined, 110],
+      ["开阳", 998, 1110, undefined, 110],
+      ["双流", 1022, 1400, undefined, 66],
+    ]
+    const maxChargeTo = 0.85;
+    const chargeLoss = 1.08;
+    const setupChargeTime = 4; 
+    const speedAdjuster = 3;
+
+    const defaultSpec = {
+      maxKw: 61,
+      speed: 120,
+      weight: 2.07,
+      baseKwPer100kmh: 17.5,
+      baseSpeed: 120,
+      chargeSpeedBefore85: 70,
+      chargeSpeedAfter85: 60,
+      cd: 0.219,
+      af: 2.2,
+      reserveSoc: 0.14,
+    }
+
+    function getChargeSpeed(target, spec) {
+      return target > 0.85 ? spec.chargeSpeedAfter85 : spec.chargeSpeedBefore85;
+    }
+
+    function formatMinutes(mins) {
+      const hours = Math.floor(mins / 60);
+      const minutes = (mins % 60).toFixed();
+      return `${hours}:${minutes.toString().padStart(2, '0')}`;
+    }
+
+    function charge(maxChargeTo, tracker, spec) {
+      tracker.currentTopSoc = maxChargeTo;
+      tracker.dynamicAllowed = spec.maxKw * (maxChargeTo - spec.reserveSoc);
+      const chargeTarget = (tracker.dynamicAllowed - tracker.remainingKw) * chargeLoss;
+      const chargeTime = (chargeTarget / getChargeSpeed(maxChargeTo, spec)) * 60 + setupChargeTime;
+      tracker.totalCharged += chargeTarget;
+      tracker.totalUsed = 0;
+      tracker.remainingKw = tracker.dynamicAllowed;
+      tracker.totalTime += chargeTime;
+      return chargeTime.toFixed();
+    }
+
+    function getSoc(tracker, spec) {
+      const soc = (tracker.currentTopSoc - tracker.totalUsed / spec.maxKw).toFixed(2);
+      return (soc * 100).toFixed(1);
+    }
+
+    function getLocaltime(tracker) {
+      return formatMinutes(tracker.totalTime);
+    }
+
+    function planTrip(spec) {
+      const { maxKw, reserveSoc } = spec;
+      const tracker = {
+        totalTime: 0,
+        totalUsed: (1 - initialSoc) * maxKw,
+        totalCharged: 0,
+        dynamicAllowed: maxKw * (1 - reserveSoc),
+        currentTopSoc: 1,
+      }
+
+      let prevStop = [...stops[0]];
+      let plannedStops = [];
+
+      for (const [name, dist, altitude, plannedCharge, speed] of stops.slice(1)) {
+        const [_, d, a] = prevStop;
+        const distBetween = dist - d;
+        const altitudeDiff = altitude - a;
+        const cruisingSpeed = speed || spec.speed;
+        const consumedKw = getConsumption(cruisingSpeed, distBetween, altitudeDiff, spec.weight, spec.baseKwPer100kmh, spec.baseSpeed, spec.cd, spec.af);
+        const spentTime = (distBetween / (cruisingSpeed - speedAdjuster)) * 60;
+
+        if (consumedKw > tracker.dynamicAllowed) {
+          alert(`${name}太远了，到不了`);
+          throw new Error(`${name}太远，到不了`);
+        }
+
+        tracker.remainingKw = tracker.dynamicAllowed - tracker.totalUsed;
+        let chargeAtNearStop = false;
+        const numOfStops = plannedStops.length;
+        if (tracker.remainingKw - consumedKw < 0) {
+          if (numOfStops < 2 || plannedStops[numOfStops - 2].chargeTime !== undefined) {
+            //已在此站充电过或者站点不存在，移步下一个服务区
+            chargeAtNearStop = true;
+          } else {
+            // 在前两个服务区充电
+            // 重置最大可用
+            const prevPlannedStop = plannedStops.pop();
+            const prevPrevPlannedStop = plannedStops.pop();
+            tracker.remainingKw += prevPlannedStop.consumedKw;
+            tracker.totalTime -= prevPlannedStop.time;
+
+            const chargeTime = charge(maxChargeTo, tracker, spec);
+
+            //修正前2服务区数据
+            const time = prevPrevPlannedStop.time + chargeTime;
+            let planNode = Object.assign(prevPrevPlannedStop, { time, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
+            plannedStops.push(planNode);
+
+            //修正前一服务区数据
+            tracker.totalTime += prevPlannedStop.time;
+            tracker.totalUsed += prevPlannedStop.consumedKw;
+            planNode = Object.assign(prevPlannedStop, { localTime: getLocaltime(tracker), soc: getSoc(tracker, spec) })
+            plannedStops.push(planNode);
+            tracker.remainingKw -= tracker.totalUsed;
+          }
+        }
+
+        if (chargeAtNearStop && numOfStops < 1) {
+          alert(`剩余电量${getSoc(tracker, spec)}%到不了${name}`);
+          throw new Error("电不够到达", name);
+        }
+
+        if (chargeAtNearStop || tracker.remainingKw - consumedKw < 0) {
+          // 在前一服务区充电
+          const prevPlannedStop = plannedStops.pop();
+          const chargeTime = charge(maxChargeTo, tracker, spec);
+          const time = prevPlannedStop.time + chargeTime;
+          plannedStops.push(Object.assign(prevPlannedStop, { time, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) }));
+        }
+
+        // 更新当前服务区数据
+        tracker.totalUsed += consumedKw;
+        tracker.totalTime += spentTime;
+        plannedStops.push({ name, time: spentTime, cruisingSpeed, consumedKw, localTime: getLocaltime(tracker), soc: getSoc(tracker, spec) });
+
+        if (plannedCharge && plannedCharge * 100 > getSoc(tracker, spec)) {
+          tracker.remainingKw = tracker.dynamicAllowed - tracker.totalUsed;
+          // 当前服务区计划充电
+          const currentPlannedStop = plannedStops.pop();
+          const chargeTime = charge(plannedCharge, tracker, spec);
+          const time = currentPlannedStop.time + chargeTime;
+          const planNode = Object.assign(currentPlannedStop, { time, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
+          plannedStops.push(planNode);
+        }
+
+        prevStop = [0, dist, altitude];
+      }
+
+      return plannedStops.map(({ name, new_soc, soc, cruisingSpeed, consumedKw, localTime, chargeTime }) => {
+        return { name, cruisingSpeed, consumedKw: consumedKw.toFixed(2), soc: `${soc}%`, localTime, chargeTime, new_soc }
+      });
+    }
+
+
+    // DOM元素引用
+    const tableBody = document.getElementById('tableBody');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // 初始化表格数据
+    function initializeTable() {
+      plans = planTrip(defaultSpec);
+      tableBody.innerHTML = '';
+
+      plans.forEach((stop, index) => {
+        const row = document.createElement('tr');
+
+        const kwCell = document.createElement('td');
+        kwCell.textContent = `${stop.name}:${stop.cruisingSpeed}km/h - ${stop.consumedKw}度(${stop.soc}) - ${stop.localTime} - ${stop.chargeTime ? stop.chargeTime + '分钟 ' + stop.new_soc + '%' : 'N/A'}`;
+        row.appendChild(kwCell);
+
+        const newSocCell = document.createElement('td');
+        const socInput = document.createElement('input');
+        socInput.type = 'number';
+        socInput.min = 10;
+        socInput.max = 100;
+        socInput.step = 5;
+        socInput.value = stop.new_soc;
+        socInput.className = 'editable';
+        newSocCell.appendChild(socInput);
+        row.appendChild(newSocCell);
+
+        // 添加删除按钮
+        const actionCell = document.createElement('td');
+        actionCell.className = 'action-cell';
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '删除';
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.onclick = function () {
+          row.remove();
+        };
+        actionCell.appendChild(deleteBtn);
+        row.appendChild(actionCell);
+
+        tableBody.appendChild(row);
+      });
+    }
+
+    function findStop(n, charge) {
+      for (const [name, dist, altitude, plannedCharge, speed] of stops) {
+        if (name === n) {
+          const c = charge === 100 ? 1 : parseFloat("0." + charge);
+          return [name, dist, altitude, c, speed]
+        }
+      }
+    }
+
+    // 提交表格数据
+    function submitTableData() {
+      const rows = tableBody.querySelectorAll('tr');
+      const newStops = [];
+
+      const firstRow = rows[0].querySelectorAll('td');
+      const initial = parseInt(firstRow[1].querySelector('input').value);
+      if (initial > 0) {
+        initialSoc = initial === 100 ? 1 : parseFloat("0." + initial);
+      } else {
+        newStops.push(start);
+      }
+
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        const [name, ...rest] = cells[0].textContent.split(":");
+        newStops.push(findStop(name, parseInt(cells[1].querySelector('input').value)));
+      });
+      stops = newStops;
+      initializeTable();
+    }
+
+    // 事件监听
+    submitBtn.addEventListener('click', submitTableData);
+
+    // 初始化页面
+    window.onload = initializeTable;
+  </script>
+</body>
+
+</html>
