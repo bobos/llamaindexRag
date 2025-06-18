@@ -166,6 +166,21 @@
       margin: 5px 0;
     }
 
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .row.single {
+      justify-content: center;
+    }
+
     /* 响应式设计 */
     @media screen and (max-width: 768px) {
 
@@ -225,6 +240,19 @@
       <button id="submitBtn">安排</button>
     </div>
 
+    <div class="form-group">
+      <div class="row single">
+        <input type="text" id="initial" placeholder="初始电量0-100">
+        <input type="text" id="newVelo" placeholder="默认巡航速度">
+      </div>
+      <div class="row">
+        <input type="text" id="resetStop" placeholder="所在服务区">
+        <input type="text" id="consumedKw" placeholder="已消耗电量度数">
+        <input type="text" id="velo" placeholder="新基准速度">
+      </div>
+      <button id="resetBtn" class="delete-btn">基准重置</button>
+    </div>
+
   </div>
 
   <script>
@@ -238,7 +266,7 @@
       return (dragForce * d) / J2KwhFactor;  // J -> kwh
     }
 
-    function getGravityEnergyKwh(distance, weight, altitudeDiff, eta) {
+    function getGravityEnergyKwh(distance, weight, altitudeDiff, eta=0.35) {
       const massKg = weight * 1000;
       const g = 9.8;
       const d = distance *  1000;
@@ -263,9 +291,65 @@
       return horizontal + getGravityEnergyKwh(distance, weight, altitudeDiff, eta);
     }
 
+    function reviseBaseKw(allStops, consumedEnergy, velocity, spec) {
+      const actualDistance = allStops[allStops.length - 1][1];
+      let prevStop = [...allStops[0]];
+      let gravityEnergy = 0;
+      for (const [_, d, a] of allStops.slice(1)) {
+        const altDiff = a - prevStop[2];
+        const dist = d - prevStop[1];
+        gravityEnergy += getGravityEnergyKwh(dist, spec.weight, altDiff);
+      }
+
+      return (consumedEnergy - gravityEnergy) * 100 / actualDistance;
+    }
+
+    function getStandardSoc(socInt) {
+      const init = parseInt(socInt);
+      return init >= 100 ? 1 : parseFloat("0." + init);
+    }
+
+    function revisePlan(stopName, consumedKw, velocity, spec = defaultSpec) {
+      let end = 0;
+      for (const [name, ...rest] of STOPS) {
+        end++;
+        if (name === stopName) break;
+      }
+
+      if (end === STOPS.length) {
+        alert(`服务区${stopName}找不到`);
+        return;
+      }
+
+      const passedStops = STOPS.slice(0, end);
+      const newStops = STOPS.slice(end - 1);
+      const [_, d, a] = newStops[0];
+      newStops[0] = [start, d, a];
+      const newBaseKw = reviseBaseKw(passedStops, consumedKw, velocity, spec);
+      alert(`修正电耗:${newBaseKw}@${velocity} vs 默认电耗:${spec.baseKwPer100kmh}@${spec.baseSpeed}`);
+      const newSpec = Object.assign({...spec}, {baseKwPer100kmh: newBaseKw, baseSpeed: velocity});
+
+      STOPS = newStops;
+      initialSpec = newSpec;
+      initializeTable();
+    }
+
+    document.getElementById('resetBtn').addEventListener('click', function() {
+      const stopName = document.getElementById('resetStop').value.trim();
+      const consumedKw = document.getElementById('consumedKw').value.trim();
+      const velocity = document.getElementById('velo').value.trim();
+
+      if (!stopName || !consumedKw || !velocity) {
+        alert("参数不能为空");
+        return;
+      }
+
+      revisePlan(stopName, parseFloat(consumedKw), parseInt(velocity));
+    });
+
     let initialSoc = 1;
     //const start = ["起点", 0, 24];
-    //let stops = [
+    //let STOPS = [
     //  start,
     //  ["四会", 127, 24],
     //  ["广宁", 142, 44],
@@ -297,7 +381,7 @@
     //]
 
     const start = ["起点", 0, 24];
-    let stops = [
+    let STOPS = [
       start,
       ["四会", 127, 24],
       ["广宁", 142, 44],
@@ -345,6 +429,7 @@
       reserveSoc: 0.14,
     }
 
+    let initialSpec = defaultSpec;
     function getChargeSpeed(target, spec) {
       return target > 0.85 ? spec.chargeSpeedAfter85 : spec.chargeSpeedBefore85;
     }
@@ -376,7 +461,21 @@
       return formatMinutes(tracker.totalTime);
     }
 
+    function getInitialSoc() {
+      const init = document.getElementById("initial").value.trim();
+      if (init && init !== '888') {
+        initialSoc = getStandardSoc(init);
+      }
+    }
+
     function planTrip(spec) {
+      getInitialSoc();
+      let specSpeed = spec.speed;
+      const newSpeed = document.getElementById("newVelo").value.trim();
+      if (newSpeed) {
+        specSpeed = parseInt(newSpeed);
+      }
+
       const { maxKw, reserveSoc } = spec;
       const tracker = {
         totalTime: 0,
@@ -386,14 +485,14 @@
         currentTopSoc: 1,
       }
 
-      let prevStop = [...stops[0]];
+      let prevStop = [...STOPS[0]];
       let plannedStops = [];
 
-      for (const [name, dist, altitude, plannedCharge, speed] of stops.slice(1)) {
+      for (const [name, dist, altitude, plannedCharge, speed] of STOPS.slice(1)) {
         const [_, d, a] = prevStop;
         const distBetween = dist - d;
         const altitudeDiff = altitude - a;
-        const cruisingSpeed = speed || spec.speed;
+        const cruisingSpeed = speed || specSpeed;
         const consumedKw = getConsumption(cruisingSpeed, distBetween, altitudeDiff, spec.weight, spec.baseKwPer100kmh, spec.baseSpeed, spec.cd, spec.af);
         const spentTime = (distBetween / (cruisingSpeed - speedAdjuster)) * 60;
 
@@ -476,7 +575,7 @@
 
     // 初始化表格数据
     function initializeTable() {
-      plans = planTrip(defaultSpec);
+      plans = planTrip(initialSpec);
       tableBody.innerHTML = '';
 
       plans.forEach((stop, index) => {
@@ -514,9 +613,9 @@
     }
 
     function findStop(n, charge) {
-      for (const [name, dist, altitude, plannedCharge, speed] of stops) {
+      for (const [name, dist, altitude, plannedCharge, speed] of STOPS) {
         if (name === n) {
-          const c = charge === 100 ? 1 : parseFloat("0." + charge);
+          const c = charge ? getStandardSoc(charge) : undefined;
           return [name, dist, altitude, c, speed]
         }
       }
@@ -527,10 +626,11 @@
       const rows = tableBody.querySelectorAll('tr');
       const newStops = [];
 
+      const ind = document.getElementById("initial").value.trim();
       const firstRow = rows[0].querySelectorAll('td');
-      const initial = parseInt(firstRow[1].querySelector('input').value);
-      if (initial > 0) {
-        initialSoc = initial === 100 ? 1 : parseFloat("0." + initial);
+      const initial = firstRow[1].querySelector('input').value.trim();
+      if (initial&&ind === "888") {
+        initialSoc = getStandardSoc(initial);
       } else {
         newStops.push(start);
       }
@@ -538,9 +638,9 @@
       rows.forEach(row => {
         const cells = row.querySelectorAll('td');
         const [name, ...rest] = cells[0].textContent.split(":");
-        newStops.push(findStop(name, parseInt(cells[1].querySelector('input').value)));
+        newStops.push(findStop(name, cells[1].querySelector('input').value.trim()));
       });
-      stops = newStops;
+      STOPS = newStops;
       initializeTable();
     }
 
