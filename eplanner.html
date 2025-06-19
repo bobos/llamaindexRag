@@ -222,6 +222,14 @@
 
 <body>
   <div class="container">
+    <div>
+      <label for="routeSelect">路线</label>
+      <select id="routeSelect">
+        <option value="gd2sjb">广东至三江北</option>
+        <option value="ms2gz">三江北至贵州</option>
+      </select>
+    </div>
+
     <div class="table-container">
       <table id="dataTable">
         <thead>
@@ -266,7 +274,7 @@
       return (dragForce * d) / J2KwhFactor;  // J -> kwh
     }
 
-    function getGravityEnergyKwh(distance, weight, altitudeDiff, eta=0.35) {
+    function getGravityEnergyKwh(distance, weight, altitudeDiff, eta=0.5) {
       const massKg = weight * 1000;
       const g = 9.8;
       const d = distance *  1000;
@@ -274,11 +282,11 @@
       const slopeRad = Math.atan(slope);
 
       const slopeForce = massKg * g * Math.sin(slopeRad);
-      const slopeEnergy = 1.65 * (slopeForce * d) / J2KwhFactor; // 16.5为经验值
+      const slopeEnergy = 1.2 * (slopeForce * d) / J2KwhFactor;
       return altitudeDiff >=0 ? slopeEnergy : slopeEnergy * eta;
     }
 
-    function getConsumption(velocity, distance, altitudeDiff, weight = 2.07, energyBase = 17.5, velocityBase = 120, cd = 0.219, af = 2.2, eta = 0.35) {
+    function getConsumption(velocity, distance, altitudeDiff, weight = 2.07, energyBase = 17.7, velocityBase = 120, cd = 0.219, af = 2.2, eta = 0.5) {
       //计算每百公里基线滚阻(减去风阻)
       const distanceBase = 100;
       const baseDragEnergy = getDragEnergyKwh(velocityBase, distanceBase, cd, af);
@@ -309,6 +317,20 @@
       return init >= 100 ? 1 : parseFloat("0." + init);
     }
 
+    function setRoute() {
+      const selectBox = document.getElementById("routeSelect");
+      const selectedValue = selectBox.value.trim();
+      const routes = ROUTES[selectedValue];
+
+      if (!routes) {
+        alert(`${selectedValue} 该路线不存在`);
+        return;
+      }
+
+      START = routes[0];
+      STOPS = routes;
+    }
+
     function revisePlan(stopName, consumedKw, velocity, spec = defaultSpec) {
       let end = 0;
       for (const [name, ...rest] of STOPS) {
@@ -324,7 +346,7 @@
       const passedStops = STOPS.slice(0, end);
       const newStops = STOPS.slice(end - 1);
       const [_, d, a] = newStops[0];
-      newStops[0] = [start, d, a];
+      newStops[0] = [START, d, a];
       const newBaseKw = reviseBaseKw(passedStops, consumedKw, velocity, spec);
       alert(`修正电耗:${newBaseKw}@${velocity} vs 默认电耗:${spec.baseKwPer100kmh}@${spec.baseSpeed}`);
       const newSpec = Object.assign({...spec}, {baseKwPer100kmh: newBaseKw, baseSpeed: velocity});
@@ -347,70 +369,76 @@
       revisePlan(stopName, parseFloat(consumedKw), parseInt(velocity));
     });
 
-    let initialSoc = 1;
-    //const start = ["起点", 0, 24];
-    //let STOPS = [
-    //  start,
-    //  ["四会", 127, 24],
-    //  ["广宁", 142, 44],
-    //  ["怀城", 186, 85],
-    //  ["梁村", 218, 96],
-    //  ["白马", 244, 86],
-    //  ["大桂山", 262, 186],
-    //  ["贺州", 284, 151],
-    //  ["同古", 334, 186],
-    //  ["平乐", 396, 230],
-    //  ["高田", 432, 136],
-    //  ["东山", 456, 134],
-    //  ["会仙", 476, 147, 0.65],
-    //  ["桂林", 498, 180],
-    //  ["五通", 523, 270],
-    //  ["宛田", 548, 375],
-    //  ["龙胜", 576, 252],
-    //  ["三江北", 614, 190, 1],
-    //  ["肇兴", 648, 340, undefined, 110],
-    //  ["洛香", 674, 410, undefined, 110],
-    //  ["四格", 761, 710, undefined, 110],
-    //  ["天星桥", 813, 740, undefined, 110],
-    //  ["清水江", 826, 810, undefined, 110],
-    //  ["贵定天福", 886, 1042, undefined, 110],
-    //  ["龙洞堡", 933, 1120, undefined, 110],
-    //  ["永乐", 948, 1170, undefined, 110],
-    //  ["开阳", 998, 1110, undefined, 110],
-    //  ["双流", 1022, 1400, undefined, 66],
-    //]
+    document.getElementById("routeSelect").addEventListener("change", function () {
+      setRoute();
+      initializeTable();
+    });
 
-    const start = ["起点", 0, 24];
-    let STOPS = [
-      start,
-      ["四会", 127, 24],
-      ["广宁", 142, 44],
-      ["怀城", 186, 85],
-      ["梁村", 218, 96],
-      ["白马", 244, 86],
-      ["大桂山", 262, 186],
-      ["贺州", 284, 151],
-      ["同古", 334, 186],
-      ["平乐", 396, 230],
-      ["高田", 432, 136],
-      ["东山", 456, 134],
-      ["会仙", 476, 147, 0.65],
-      ["桂林", 498, 180],
-      ["五通", 523, 270],
-      ["宛田", 548, 375],
-      ["龙胜", 576, 252],
-      ["三江北", 614, 190, 1],
-      ["肇兴", 648, 340, undefined, 110],
-      ["洛香", 674, 410, undefined, 110],
-      ["四格", 761, 710, undefined, 110],
-      ["天星桥", 813, 740, undefined, 110],
-      ["清水江", 826, 810, undefined, 110],
-      ["贵定天福", 886, 1042, undefined, 110],
-      ["龙洞堡", 933, 1120, undefined, 110],
-      ["永乐", 948, 1170, undefined, 110],
-      ["开阳", 998, 1110, undefined, 110],
-      ["双流", 1022, 1400, undefined, 66],
-    ]
+    const SpeedLimit = {
+      "从埔高速": 110,
+      "珠三角环线": 110,
+      "大广高速": 120,
+    }
+    let initialSoc = 1;
+    let STOPS = [];
+    let START = [];
+    const ROUTES = {
+      gd2sjb: [
+        ["起点", 0, 24],
+        ["大塘", 77.8, 21, undefined, 110],
+        ["龙甫", 111.3, 24, undefined, 110],
+        ["四会", 131.8, 24],
+        ["广宁", 146.9, 41],
+        ["怀城", 191.2, 85],
+        ["梁村", 223.4, 89],
+        ["白马", 248.9, 86],
+        ["大桂山", 267.1, 186],
+        ["贺州", 289.8, 145],
+        ["同古", 339.3, 186],
+        ["同安停车区", 369.9, 159], //*
+        ["平乐", 401.6, 228],
+        ["高田", 437, 136],
+        ["东山", 461.3, 134],
+        ["会仙", 481.1, 145],
+        ["桂林", 503, 175],
+        ["五通", 528.5, 267],
+        ["宛田", 553.5, 373],
+        ["龙胜", 581.5, 252],
+        ["三江北", 618.7, 191],
+        ["三江北收费站(G76夏蓉高速出口)", 620.7, 223, 80]
+        //["肇兴", 644.9, 340, undefined, 110],
+        //["四格", 761, 710, undefined, 110],
+        //["天星桥", 813, 740, undefined, 110],
+        //["清水江", 826, 810, undefined, 110],
+        //["贵定天福", 886, 1042, undefined, 110],
+        //["龙洞堡", 933, 1120, undefined, 110],
+        //["永乐", 948, 1170, undefined, 110],
+        //["开阳", 998, 1110, undefined, 110],
+        //["双流", 1022, 1400, undefined, 66]
+      ],
+      ms2gz: [
+        ["起点", 0, 423],
+        ["水口收费站", 19, 281, undefined, 60],
+        ["洛香", 44, 386, undefined, 110],
+        ["贵迷", 57, 341, undefined, 110], //*
+        ["新民", 84.1, 726, undefined, 110],
+        ["榕江停车区", 114.3, 550, undefined, 110], //*
+        ["四格", 132.1, 710, undefined, 110],
+        ["排洞", 159.5, 650, undefined, 110], //*
+        ["天星桥", 183.5, 735, undefined, 110],
+        ["清水江", 196.5, 810, undefined, 110],
+        ["摆梭", 238.4, 1123, undefined, 110], //*
+        ["贵定天福", 256.1, 1042, undefined, 110],
+        ["龙里", 273.6, 1368, undefined, 110], //*
+        ["龙洞堡", 302.7, 1120, undefined, 110],
+        ["小碧", 304, 1161, undefined, 110], //*
+        ["永乐", 318.3, 1173, undefined, 110],
+        ["柿花寨", 355.7, 1237, undefined, 110], //*
+        ["开阳", 368.3, 1110, undefined, 110],
+        ["双流", 393, 1400, undefined, 66]
+      ]
+    }
+    
     const maxChargeTo = 0.85;
     const chargeLoss = 1.08;
     const setupChargeTime = 4; 
@@ -418,9 +446,9 @@
 
     const defaultSpec = {
       maxKw: 61,
-      speed: 120,
+      speed: 118,
       weight: 2.07,
-      baseKwPer100kmh: 17.5,
+      baseKwPer100kmh: 17.7,
       baseSpeed: 120,
       chargeSpeedBefore85: 70,
       chargeSpeedAfter85: 60,
@@ -632,7 +660,7 @@
       if (initial&&ind === "888") {
         initialSoc = getStandardSoc(initial);
       } else {
-        newStops.push(start);
+        newStops.push(START);
       }
 
       rows.forEach(row => {
@@ -648,6 +676,7 @@
     submitBtn.addEventListener('click', submitTableData);
 
     // 初始化页面
+    setRoute();
     window.onload = initializeTable;
   </script>
 </body>
