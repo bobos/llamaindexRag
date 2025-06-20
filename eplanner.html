@@ -227,6 +227,7 @@
       <select id="routeSelect">
         <option value="gd2sjb">广东至三江北</option>
         <option value="ms2gz">三江北至贵州</option>
+        <option value="gz2gd">贵州至广东</option>
       </select>
     </div>
 
@@ -282,11 +283,11 @@
       const slopeRad = Math.atan(slope);
 
       const slopeForce = massKg * g * Math.sin(slopeRad);
-      const slopeEnergy = 1.2 * (slopeForce * d) / J2KwhFactor;
+      const slopeEnergy = 1.5 * (slopeForce * d) / J2KwhFactor; // 1.2为精准系数，考虑到路途中起伏难测，加到1.5
       return altitudeDiff >=0 ? slopeEnergy : slopeEnergy * eta;
     }
 
-    function getConsumption(velocity, distance, altitudeDiff, weight = 2.07, energyBase = 17.7, velocityBase = 120, cd = 0.219, af = 2.2, eta = 0.5) {
+    function getConsumption(velocity, distance, altitudeDiff, weight = 2.07, energyBase = 17.6, velocityBase = 120, cd = 0.219, af = 2.2, eta = 0.5) {
       //计算每百公里基线滚阻(减去风阻)
       const distanceBase = 100;
       const baseDragEnergy = getDragEnergyKwh(velocityBase, distanceBase, cd, af);
@@ -395,7 +396,7 @@
         ["大桂山", 267.1, 186],
         ["贺州", 289.8, 145],
         ["同古", 339.3, 186],
-        ["同安停车区", 369.9, 159], //*
+        ["同安停车区", 369.9, 159, undefined, undefined, true],
         ["平乐", 401.6, 228],
         ["高田", 437, 136],
         ["东山", 461.3, 134],
@@ -405,37 +406,69 @@
         ["宛田", 553.5, 373],
         ["龙胜", 581.5, 252],
         ["三江北", 618.7, 191],
-        ["三江北收费站(G76夏蓉高速出口)", 620.7, 223, 80]
-        //["肇兴", 644.9, 340, undefined, 110],
-        //["四格", 761, 710, undefined, 110],
-        //["天星桥", 813, 740, undefined, 110],
-        //["清水江", 826, 810, undefined, 110],
-        //["贵定天福", 886, 1042, undefined, 110],
-        //["龙洞堡", 933, 1120, undefined, 110],
-        //["永乐", 948, 1170, undefined, 110],
-        //["开阳", 998, 1110, undefined, 110],
-        //["双流", 1022, 1400, undefined, 66]
+        ["三江北收费站(G76夏蓉高速出口)", 620.7, 223, undefined, 80]
       ],
       ms2gz: [
         ["起点", 0, 423],
         ["水口收费站", 19, 281, undefined, 60],
         ["洛香", 44, 386, undefined, 110],
-        ["贵迷", 57, 341, undefined, 110], //*
+        ["贵迷", 57, 341, undefined, 110, true],
         ["新民", 84.1, 726, undefined, 110],
-        ["榕江停车区", 114.3, 550, undefined, 110], //*
+        ["榕江停车区", 114.3, 550, undefined, 110, true],
         ["四格", 132.1, 710, undefined, 110],
-        ["排洞", 159.5, 650, undefined, 110], //*
+        ["排洞", 159.5, 650, undefined, 110, true],
         ["天星桥", 183.5, 735, undefined, 110],
         ["清水江", 196.5, 810, undefined, 110],
-        ["摆梭", 238.4, 1123, undefined, 110], //*
+        ["摆梭", 238.4, 1123, undefined, 110, true],
         ["贵定天福", 256.1, 1042, undefined, 110],
-        ["龙里", 273.6, 1368, undefined, 110], //*
+        ["龙里", 273.6, 1368, undefined, 110, true],
         ["龙洞堡", 302.7, 1120, undefined, 110],
-        ["小碧", 304, 1161, undefined, 110], //*
+        ["小碧", 304, 1161, undefined, 110, true],
         ["永乐", 318.3, 1173, undefined, 110],
-        ["柿花寨", 355.7, 1237, undefined, 110], //*
+        ["柿花寨", 355.7, 1237, undefined, 110, true],
         ["开阳", 368.3, 1110, undefined, 110],
         ["双流", 393, 1400, undefined, 66]
+      ],
+      gz2gd: [
+        ["起点", 0, 1400],
+        ["开阳", 24.9, 1110, undefined, 66],
+        ["柿花寨", 37.1, 1237, undefined, 110, true],
+        ["永乐", 73.9, 1173, undefined, 110],
+        ["龙洞堡", 90.4, 1120, undefined, 110],
+        ["龙里", 119.1, 1368, undefined, 110, true],
+        ["贵定天福", 137.1, 1042, undefined, 110],
+        ["摆梭", 154.3, 1123, undefined, 110, true],
+        ["清水江", 195.9, 810, undefined, 110],
+        ["天星桥", 209.7, 735, undefined, 110],
+        ["排洞", 241.7, 650, undefined, 110, true],
+        ["四格", 259.6, 710, undefined, 110],
+        ["榕江停车区", 278.8, 550, undefined, 110, true],
+        ["新民", 310.3, 726, undefined, 110],
+        ["贵迷", 336, 341, undefined, 110, true],
+        ["洛香", 348.7, 386, undefined, 110],
+        ["肇兴", 375.4, 340, undefined, 110],
+        ["三江北", 409.3, 191],
+        ["龙胜", 446.4, 252],
+        ["宛田", 474.3, 373],
+        ["五通", 499.7, 267],
+        ["桂林", 525.1, 175],
+        ["会仙", 546.7, 145],
+        ["东山", 566.7, 134],
+        ["高田", 590.2, 136],
+        ["平乐", 625.5, 228],
+        ["同安停车区", 658.2, 159, undefined, undefined, true],
+        ["同古", 688.2, 186],
+        ["贺州", 738.1, 145],
+        ["大桂山", 760.3, 186, undefined, undefined, true],
+        ["信都收费站(G78汕昆高速出口)", 774, 100, 1],
+        ["白马", 780, 86],
+        ["梁村", 805.5, 89],
+        ["怀城", 837.1, 85],
+        ["广宁", 881.5, 41],
+        ["四会", 897.1, 24],
+        ["龙甫", 916.6, 24, undefined, 110],
+        ["大塘", 951.1, 21, undefined, 110],
+        ["家", 1027.6, 24, undefined, 110]
       ]
     }
     
@@ -446,9 +479,9 @@
 
     const defaultSpec = {
       maxKw: 61,
-      speed: 118,
+      speed: 120,
       weight: 2.07,
-      baseKwPer100kmh: 17.7,
+      baseKwPer100kmh: 17.6,
       baseSpeed: 120,
       chargeSpeedBefore85: 70,
       chargeSpeedAfter85: 60,
@@ -471,13 +504,14 @@
     function charge(maxChargeTo, tracker, spec) {
       tracker.currentTopSoc = maxChargeTo;
       tracker.dynamicAllowed = spec.maxKw * (maxChargeTo - spec.reserveSoc);
-      const chargeTarget = (tracker.dynamicAllowed - tracker.remainingKw) * chargeLoss;
+      const actualEnergy = tracker.dynamicAllowed - tracker.remainingKw;
+      const chargeTarget = actualEnergy * chargeLoss;
       const chargeTime = (chargeTarget / getChargeSpeed(maxChargeTo, spec)) * 60 + setupChargeTime;
       tracker.totalCharged += chargeTarget;
       tracker.totalUsed = 0;
       tracker.remainingKw = tracker.dynamicAllowed;
       tracker.totalTime += chargeTime;
-      return chargeTime.toFixed();
+      return [chargeTime.toFixed(), actualEnergy];
     }
 
     function getSoc(tracker, spec) {
@@ -491,9 +525,16 @@
 
     function getInitialSoc() {
       const init = document.getElementById("initial").value.trim();
-      if (init && init !== '888') {
-        initialSoc = getStandardSoc(init);
+      if (init) {
+        if(init.startsWith('888@')) {
+          initialSoc = getStandardSoc(init.split('@')[1]);
+          return true;
+        }
+        else {
+          initialSoc = getStandardSoc(init);
+        }
       }
+      return false;
     }
 
     function planTrip(spec) {
@@ -514,14 +555,32 @@
       }
 
       let prevStop = [...STOPS[0]];
-      let plannedStops = [];
 
-      for (const [name, dist, altitude, plannedCharge, speed] of STOPS.slice(1)) {
+      //先计算各点间能耗，剔除无法充电服务区 
+      let tmpStops = [];
+      let prevConsumed = 0;
+      const slicedStops = STOPS.slice(1);
+      for (const [name, dist, altitude, plannedCharge, speed, noCharge] of slicedStops) {
         const [_, d, a] = prevStop;
         const distBetween = dist - d;
         const altitudeDiff = altitude - a;
         const cruisingSpeed = speed || specSpeed;
-        const consumedKw = getConsumption(cruisingSpeed, distBetween, altitudeDiff, spec.weight, spec.baseKwPer100kmh, spec.baseSpeed, spec.cd, spec.af);
+        const currentConsumed = getConsumption(cruisingSpeed, distBetween, altitudeDiff, spec.weight, spec.baseKwPer100kmh, spec.baseSpeed, spec.cd, spec.af);
+        prevConsumed += currentConsumed;
+        if (!noCharge) {
+          tmpStops.push([name, dist, altitude, plannedCharge, speed, prevConsumed]);
+          prevConsumed = 0;
+        }
+        prevStop = [0, dist, altitude];
+      }
+
+      let plannedStops = [];
+      prevStop = [...STOPS[0]];
+      let index = 0;
+      for (const [name, dist, altitude, plannedCharge, speed, consumedKw] of tmpStops) {
+        const [_, d, ...rest] = prevStop;
+        const distBetween = dist - d;
+        const cruisingSpeed = speed || specSpeed;
         const spentTime = (distBetween / (cruisingSpeed - speedAdjuster)) * 60;
 
         if (consumedKw > tracker.dynamicAllowed) {
@@ -544,11 +603,11 @@
             tracker.remainingKw += prevPlannedStop.consumedKw;
             tracker.totalTime -= prevPlannedStop.time;
 
-            const chargeTime = charge(maxChargeTo, tracker, spec);
+            const [chargeTime, chargeTarget] = charge(maxChargeTo, tracker, spec);
 
             //修正前2服务区数据
             const time = prevPrevPlannedStop.time + chargeTime;
-            let planNode = Object.assign(prevPrevPlannedStop, { time, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
+            let planNode = Object.assign(prevPrevPlannedStop, { time, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
             plannedStops.push(planNode);
 
             //修正前一服务区数据
@@ -568,31 +627,44 @@
         if (chargeAtNearStop || tracker.remainingKw - consumedKw < 0) {
           // 在前一服务区充电
           const prevPlannedStop = plannedStops.pop();
-          const chargeTime = charge(maxChargeTo, tracker, spec);
+          const [chargeTime, chargeTarget] = charge(maxChargeTo, tracker, spec);
           const time = prevPlannedStop.time + chargeTime;
-          plannedStops.push(Object.assign(prevPlannedStop, { time, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) }));
+          plannedStops.push(Object.assign(prevPlannedStop, { time, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) }));
         }
 
         // 更新当前服务区数据
         tracker.totalUsed += consumedKw;
         tracker.totalTime += spentTime;
-        plannedStops.push({ name, time: spentTime, cruisingSpeed, consumedKw, localTime: getLocaltime(tracker), soc: getSoc(tracker, spec) });
+        plannedStops.push({ name, dist, time: spentTime, cruisingSpeed, consumedKw, localTime: getLocaltime(tracker), soc: getSoc(tracker, spec) });
 
         if (plannedCharge && plannedCharge * 100 > getSoc(tracker, spec)) {
           tracker.remainingKw = tracker.dynamicAllowed - tracker.totalUsed;
-          // 当前服务区计划充电
-          const currentPlannedStop = plannedStops.pop();
-          const chargeTime = charge(plannedCharge, tracker, spec);
-          const time = currentPlannedStop.time + chargeTime;
-          const planNode = Object.assign(currentPlannedStop, { time, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
-          plannedStops.push(planNode);
+          const [nextName,_a2,_a3,_a4,_a5,nextConsumedEnergy] = tmpStops[index+1];
+          const gapEnergy = nextConsumedEnergy - tracker.remainingKw;
+          if (gapEnergy <= 0) {
+            const currentPlannedStop = plannedStops.pop();
+            //可安全在此服务区计划充电
+            const [chargeTime, chargeTarget] = charge(plannedCharge, tracker, spec);
+            const time = currentPlannedStop.time + chargeTime;
+            const planNode = Object.assign(currentPlannedStop, {time, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
+            plannedStops.push(planNode);
+          } else {
+            alert(`无法在<<${name}>>计划充电, 到下一备选服务区<<${nextName}>>还缺${(gapEnergy/spec.maxKw*100).toFixed(1)}%的电量`);
+          }
         }
 
-        prevStop = [0, dist, altitude];
+        prevStop = [0, dist, 0];
+        index++;
       }
 
-      return plannedStops.map(({ name, new_soc, soc, cruisingSpeed, consumedKw, localTime, chargeTime }) => {
-        return { name, cruisingSpeed, consumedKw: consumedKw.toFixed(2), soc: `${soc}%`, localTime, chargeTime, new_soc }
+      tmpStops = [];
+      for (const [name, dist, altitude, plannedCharge, speed, noCharge] of STOPS.slice(1)) {
+        const findStop = plannedStops.find(ps => ps.name === name);
+        tmpStops.push(findStop || {name, dist, time: '*', cruisingSpeed: '*', consumedKw: 0, localTime: '*', soc: '*'});
+      }
+
+      return tmpStops.map(({ name, dist, new_soc, soc, cruisingSpeed, consumedKw, localTime, chargeTime }) => {
+        return { name, dist, cruisingSpeed, consumedKw: consumedKw.toFixed(2), soc: `${soc}%`, localTime, chargeTime, new_soc }
       });
     }
 
@@ -610,7 +682,7 @@
         const row = document.createElement('tr');
 
         const kwCell = document.createElement('td');
-        kwCell.textContent = `${stop.name}:${stop.cruisingSpeed}km/h - ${stop.consumedKw}度(${stop.soc}) - ${stop.localTime} - ${stop.chargeTime ? stop.chargeTime + '分钟 ' + stop.new_soc + '%' : 'N/A'}`;
+        kwCell.textContent = `${stop.name}:${stop.dist}公里 - ${stop.cruisingSpeed}km/h - ${stop.consumedKw}度(${stop.soc}) - ${stop.localTime} - ${stop.chargeTime ? stop.chargeTime + '分钟 ' + stop.new_soc + '%' : 'N/A'}`;
         row.appendChild(kwCell);
 
         const newSocCell = document.createElement('td');
@@ -641,10 +713,10 @@
     }
 
     function findStop(n, charge) {
-      for (const [name, dist, altitude, plannedCharge, speed] of STOPS) {
+      for (const [name, dist, altitude, plannedCharge, speed, noCharge] of STOPS) {
         if (name === n) {
           const c = charge ? getStandardSoc(charge) : undefined;
-          return [name, dist, altitude, c, speed]
+          return [name, dist, altitude, c, speed, noCharge]
         }
       }
     }
@@ -654,12 +726,7 @@
       const rows = tableBody.querySelectorAll('tr');
       const newStops = [];
 
-      const ind = document.getElementById("initial").value.trim();
-      const firstRow = rows[0].querySelectorAll('td');
-      const initial = firstRow[1].querySelector('input').value.trim();
-      if (initial&&ind === "888") {
-        initialSoc = getStandardSoc(initial);
-      } else {
+      if (!getInitialSoc()) {
         newStops.push(START);
       }
 
