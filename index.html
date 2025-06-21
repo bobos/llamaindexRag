@@ -257,7 +257,6 @@
       <div class="row">
         <input type="text" id="resetStop" placeholder="所在服务区">
         <input type="text" id="consumedKw" placeholder="已消耗电量度数">
-        <input type="text" id="velo" placeholder="新基准速度">
       </div>
       <button id="resetBtn" class="delete-btn">基准重置</button>
     </div>
@@ -287,7 +286,7 @@
       return altitudeDiff >=0 ? slopeEnergy : slopeEnergy * eta;
     }
 
-    function getConsumption(velocity, distance, altitudeDiff, weight = 2.07, energyBase = 17.6, velocityBase = 120, cd = 0.219, af = 2.2, eta = 0.5) {
+    function getConsumption(velocity, distance, altitudeDiff, weight = 2.1, energyBase = 17.6, velocityBase = 120, cd = 0.219, af = 2.2, eta = 0.5) {
       //计算每百公里基线滚阻(减去风阻)
       const distanceBase = 100;
       const baseDragEnergy = getDragEnergyKwh(velocityBase, distanceBase, cd, af);
@@ -300,17 +299,20 @@
       return horizontal + getGravityEnergyKwh(distance, weight, altitudeDiff, eta);
     }
 
-    function reviseBaseKw(allStops, consumedEnergy, velocity, spec) {
+    function reviseBaseKw(allStops, consumedEnergy, spec) {
       const actualDistance = allStops[allStops.length - 1][1];
       let prevStop = [...allStops[0]];
       let gravityEnergy = 0;
-      for (const [_, d, a] of allStops.slice(1)) {
+      let averageVelocity = 0;
+      for (const [_, d, a, _c, v] of allStops.slice(1)) {
         const altDiff = a - prevStop[2];
         const dist = d - prevStop[1];
+        averageVelocity += (dist / actualDistance) * (v || spec.speed);
         gravityEnergy += getGravityEnergyKwh(dist, spec.weight, altDiff);
+        prevStop = [_, d, a, _c, v];
       }
 
-      return (consumedEnergy - gravityEnergy) * 100 / actualDistance;
+      return [(consumedEnergy - gravityEnergy) * 100 / actualDistance, averageVelocity.toFixed()];
     }
 
     function getStandardSoc(socInt) {
@@ -332,7 +334,7 @@
       STOPS = routes;
     }
 
-    function revisePlan(stopName, consumedKw, velocity, spec = defaultSpec) {
+    function revisePlan(stopName, consumedKw, spec = defaultSpec) {
       let end = 0;
       for (const [name, ...rest] of STOPS) {
         end++;
@@ -347,10 +349,10 @@
       const passedStops = STOPS.slice(0, end);
       const newStops = STOPS.slice(end - 1);
       const [_, d, a] = newStops[0];
-      newStops[0] = [START, d, a];
-      const newBaseKw = reviseBaseKw(passedStops, consumedKw, velocity, spec);
-      alert(`修正电耗:${newBaseKw}@${velocity} vs 默认电耗:${spec.baseKwPer100kmh}@${spec.baseSpeed}`);
-      const newSpec = Object.assign({...spec}, {baseKwPer100kmh: newBaseKw, baseSpeed: velocity});
+      newStops[0] = ["起点", d, a];
+      const [newBaseKw, newBaseSpeed] = reviseBaseKw(passedStops, consumedKw, spec);
+      alert(`修正电耗:${newBaseKw}@${newBaseSpeed} vs 默认电耗:${spec.baseKwPer100kmh}@${spec.baseSpeed}`);
+      const newSpec = Object.assign({...spec}, {baseKwPer100kmh: newBaseKw, baseSpeed: newBaseSpeed});
 
       STOPS = newStops;
       initialSpec = newSpec;
@@ -360,14 +362,13 @@
     document.getElementById('resetBtn').addEventListener('click', function() {
       const stopName = document.getElementById('resetStop').value.trim();
       const consumedKw = document.getElementById('consumedKw').value.trim();
-      const velocity = document.getElementById('velo').value.trim();
 
-      if (!stopName || !consumedKw || !velocity) {
+      if (!stopName || !consumedKw) {
         alert("参数不能为空");
         return;
       }
 
-      revisePlan(stopName, parseFloat(consumedKw), parseInt(velocity));
+      revisePlan(stopName, parseFloat(consumedKw));
     });
 
     document.getElementById("routeSelect").addEventListener("change", function () {
@@ -375,11 +376,6 @@
       initializeTable();
     });
 
-    const SpeedLimit = {
-      "从埔高速": 110,
-      "珠三角环线": 110,
-      "大广高速": 120,
-    }
     let initialSoc = 1;
     let STOPS = [];
     let START = [];
@@ -411,20 +407,20 @@
       ms2gz: [
         ["起点", 0, 423],
         ["水口收费站", 19, 281, undefined, 60],
-        ["洛香", 44, 386, undefined, 110],
-        ["贵迷", 57, 341, undefined, 110, true],
-        ["新民", 84.1, 726, undefined, 110],
-        ["榕江停车区", 114.3, 550, undefined, 110, true],
-        ["四格", 132.1, 710, undefined, 110],
-        ["排洞", 159.5, 650, undefined, 110, true],
-        ["天星桥", 183.5, 735, undefined, 110],
-        ["清水江", 196.5, 810, undefined, 110],
-        ["摆梭", 238.4, 1123, undefined, 110, true],
-        ["贵定天福", 256.1, 1042, undefined, 110],
-        ["龙里", 273.6, 1368, undefined, 110, true],
-        ["龙洞堡", 302.7, 1120, undefined, 110],
-        ["小碧", 304, 1161, undefined, 110, true],
-        ["永乐", 318.3, 1173, undefined, 110],
+        ["洛香", 44, 386],
+        ["贵迷", 57, 341, undefined, undefined, true],
+        ["新民", 84.1, 726],
+        ["榕江停车区", 114.3, 550, undefined, undefined, true],
+        ["四格", 132.1, 710],
+        ["排洞", 159.5, 650, undefined, undefined, true],
+        ["天星桥", 183.5, 735],
+        ["清水江", 196.5, 810],
+        ["摆梭", 238.4, 1123, undefined, undefined, true],
+        ["贵定天福", 256.1, 1042],
+        ["龙里", 273.6, 1368, undefined, undefined, true],
+        ["龙洞堡", 302.7, 1120],
+        ["小碧", 304, 1161, undefined, 100, true],
+        ["永乐", 318.3, 1173, undefined, 100],
         ["柿花寨", 355.7, 1237, undefined, 110, true],
         ["开阳", 368.3, 1110, undefined, 110],
         ["双流", 393, 1400, undefined, 66]
@@ -434,19 +430,19 @@
         ["开阳", 24.9, 1110, undefined, 66],
         ["柿花寨", 37.1, 1237, undefined, 110, true],
         ["永乐", 73.9, 1173, undefined, 110],
-        ["龙洞堡", 90.4, 1120, undefined, 110],
-        ["龙里", 119.1, 1368, undefined, 110, true],
-        ["贵定天福", 137.1, 1042, undefined, 110],
-        ["摆梭", 154.3, 1123, undefined, 110, true],
-        ["清水江", 195.9, 810, undefined, 110],
-        ["天星桥", 209.7, 735, undefined, 110],
-        ["排洞", 241.7, 650, undefined, 110, true],
-        ["四格", 259.6, 710, undefined, 110],
-        ["榕江停车区", 278.8, 550, undefined, 110, true],
-        ["新民", 310.3, 726, undefined, 110],
-        ["贵迷", 336, 341, undefined, 110, true],
-        ["洛香", 348.7, 386, undefined, 110],
-        ["肇兴", 375.4, 340, undefined, 110],
+        ["龙洞堡", 90.4, 1120, undefined, 100],
+        ["龙里", 119.1, 1368, undefined, undefined, true],
+        ["贵定天福", 137.1, 1042],
+        ["摆梭", 154.3, 1123, undefined, undefined, true],
+        ["清水江", 195.9, 810],
+        ["天星桥", 209.7, 735],
+        ["排洞", 241.7, 650, undefined, undefined, true],
+        ["四格", 259.6, 710],
+        ["榕江停车区", 278.8, 550, undefined, undefined, true],
+        ["新民", 310.3, 726],
+        ["贵迷", 336, 341, undefined, undefined, true],
+        ["洛香", 348.7, 386],
+        ["肇兴", 375.4, 340],
         ["三江北", 409.3, 191],
         ["龙胜", 446.4, 252],
         ["宛田", 474.3, 373],
@@ -466,7 +462,7 @@
         ["怀城", 837.1, 85],
         ["广宁", 881.5, 41],
         ["四会", 897.1, 24],
-        ["龙甫", 916.6, 24, undefined, 110],
+        ["龙甫", 916.6, 24],
         ["大塘", 951.1, 21, undefined, 110],
         ["家", 1027.6, 24, undefined, 110]
       ]
@@ -475,12 +471,12 @@
     const maxChargeTo = 0.85;
     const chargeLoss = 1.08;
     const setupChargeTime = 4; 
-    const speedAdjuster = 3;
+    const speedAdjuster = 0.92; //根据高德导航预估乘以0.9得出
 
     const defaultSpec = {
       maxKw: 61,
       speed: 120,
-      weight: 2.07,
+      weight: 2.1,
       baseKwPer100kmh: 17.6,
       baseSpeed: 120,
       chargeSpeedBefore85: 70,
@@ -581,7 +577,7 @@
         const [_, d, ...rest] = prevStop;
         const distBetween = dist - d;
         const cruisingSpeed = speed || specSpeed;
-        const spentTime = (distBetween / (cruisingSpeed - speedAdjuster)) * 60;
+        const spentTime = (distBetween / (cruisingSpeed * speedAdjuster)) * 60;
 
         if (consumedKw > tracker.dynamicAllowed) {
           alert(`${name}太远了，到不了`);
@@ -607,7 +603,7 @@
 
             //修正前2服务区数据
             const time = prevPrevPlannedStop.time + chargeTime;
-            let planNode = Object.assign(prevPrevPlannedStop, { time, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
+            let planNode = Object.assign(prevPrevPlannedStop, { time, totalCharged: tracker.totalCharged, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
             plannedStops.push(planNode);
 
             //修正前一服务区数据
@@ -629,7 +625,7 @@
           const prevPlannedStop = plannedStops.pop();
           const [chargeTime, chargeTarget] = charge(maxChargeTo, tracker, spec);
           const time = prevPlannedStop.time + chargeTime;
-          plannedStops.push(Object.assign(prevPlannedStop, { time, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) }));
+          plannedStops.push(Object.assign(prevPlannedStop, { time, totalCharged:tracker.totalCharged, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) }));
         }
 
         // 更新当前服务区数据
@@ -646,7 +642,7 @@
             //可安全在此服务区计划充电
             const [chargeTime, chargeTarget] = charge(plannedCharge, tracker, spec);
             const time = currentPlannedStop.time + chargeTime;
-            const planNode = Object.assign(currentPlannedStop, {time, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
+            const planNode = Object.assign(currentPlannedStop, {time, totalCharged:tracker.totalCharged, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
             plannedStops.push(planNode);
           } else {
             alert(`无法在<<${name}>>计划充电, 到下一备选服务区<<${nextName}>>还缺${(gapEnergy/spec.maxKw*100).toFixed(1)}%的电量`);
@@ -663,8 +659,8 @@
         tmpStops.push(findStop || {name, dist, time: '*', cruisingSpeed: '*', consumedKw: 0, localTime: '*', soc: '*'});
       }
 
-      return tmpStops.map(({ name, dist, new_soc, soc, cruisingSpeed, consumedKw, localTime, chargeTime }) => {
-        return { name, dist, cruisingSpeed, consumedKw: consumedKw.toFixed(2), soc: `${soc}%`, localTime, chargeTime, new_soc }
+      return tmpStops.map(({ name, totalCharged, dist, new_soc, soc, cruisingSpeed, consumedKw, localTime, chargeTime }) => {
+        return { name, dist, cruisingSpeed, totalCharged, consumedKw: consumedKw.toFixed(2), soc: `${soc}%`, localTime, chargeTime, new_soc }
       });
     }
 
@@ -678,11 +674,11 @@
       plans = planTrip(initialSpec);
       tableBody.innerHTML = '';
 
-      plans.forEach((stop, index) => {
+      [{name: '起点', dist: 0, cruisingSpeed: 0, consumedKw: 0, soc: initialSoc * 100 + '%', localTime: '0:00'},...plans].forEach((stop, index) => {
         const row = document.createElement('tr');
 
         const kwCell = document.createElement('td');
-        kwCell.textContent = `${stop.name}:${stop.dist}公里 - ${stop.cruisingSpeed}km/h - ${stop.consumedKw}度(${stop.soc}) - ${stop.localTime} - ${stop.chargeTime ? stop.chargeTime + '分钟 ' + stop.new_soc + '%' : 'N/A'}`;
+            kwCell.textContent = `${stop.name}:${stop.dist}公里 - ${stop.cruisingSpeed}km/h - ${stop.consumedKw}度(${stop.soc}) - ${stop.localTime} - ${stop.chargeTime ? stop.chargeTime + '分钟 ' + stop.new_soc + '%' : 'N/A'} - 总充电:${stop.totalCharged}`;
         row.appendChild(kwCell);
 
         const newSocCell = document.createElement('td');
@@ -733,7 +729,7 @@
       rows.forEach(row => {
         const cells = row.querySelectorAll('td');
         const [name, ...rest] = cells[0].textContent.split(":");
-        newStops.push(findStop(name, cells[1].querySelector('input').value.trim()));
+        if (name !== "起点") newStops.push(findStop(name, cells[1].querySelector('input').value.trim()));
       });
       STOPS = newStops;
       initializeTable();
