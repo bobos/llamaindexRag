@@ -395,7 +395,6 @@
       "龙甫": [112.708, 23.38],
       "四会": [112.534, 23.432],
       "广宁": [112.434, 23.523],
-
     };
     const ROUTES = {
       gd2sjb: [
@@ -772,31 +771,31 @@
       return R * c; // 返回距离(km)
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => { // 成功回调
-        alert("定位成功");
-        const { latitude, longitude } = position.coords;
-        let dist = -1;
-        let n = "";
-        for (const name in GPS) {
-          const [long, lat] = GPS[name];
-          const d = calculateDistance(latitude, longitude, lat, long);
-          if (dist === -1 || dist > d) {
-            dist = d;
-            n = name
-          }
-        }
-        document.getElementById('resetStop').value = n;
-      },
-      (error) => { // 失败回调
-        alert("定位失败");
-      },
-      { 
-        enableHighAccuracy: false, // 高精度模式
-        timeout: 10000,           // 超时10秒
-        maximumAge: 60000         // 缓存有效期
-      }
-    );
+    //navigator.geolocation.getCurrentPosition(
+    //  (position) => { // 成功回调
+    //    alert("定位成功");
+    //    const { latitude, longitude } = position.coords;
+    //    let dist = -1;
+    //    let n = "";
+    //    for (const name in GPS) {
+    //      const [long, lat] = GPS[name];
+    //      const d = calculateDistance(latitude, longitude, lat, long);
+    //      if (dist === -1 || dist > d) {
+    //        dist = d;
+    //        n = name
+    //      }
+    //    }
+    //    document.getElementById('resetStop').value = n;
+    //  },
+    //  (error) => { // 失败回调
+    //    alert("定位失败");
+    //  },
+    //  { 
+    //    enableHighAccuracy: false, // 高精度模式
+    //    timeout: 10000,           // 超时10秒
+    //    maximumAge: 60000         // 缓存有效期
+    //  }
+    //);
 
     // 事件监听
     submitBtn.addEventListener('click', submitTableData);
