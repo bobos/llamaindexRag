@@ -394,6 +394,7 @@
       "大塘": [112.975, 23.432],
       "龙甫": [112.708, 23.38],
       "四会": [112.534, 23.432],
+      "广宁": [112.434, 23.523],
 
     };
     const ROUTES = {
@@ -778,8 +779,8 @@
         let dist = -1;
         let n = "";
         for (const name in GPS) {
-          const [lang, long] = GPS[name];
-          const d = calculateDistance(latitude, longitude, lang, long);
+          const [long, lat] = GPS[name];
+          const d = calculateDistance(latitude, longitude, lat, long);
           if (dist === -1 || dist > d) {
             dist = d;
             n = name
