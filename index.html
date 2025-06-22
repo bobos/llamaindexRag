@@ -267,14 +267,14 @@
     const J2KwhFactor = 3.6e6;
     function getDragEnergyKwh(velocity, distance, cd, af) {
       const rho = 1.225;  //空气密度kg/m3
-      const v = velocity * 1000 / 3600; // km/h -> m/s
+      const v = velocity * actualSpeedAdjuster * 1000 / 3600; // km/h -> m/s
       const d = distance * 1000;  // km -> m
 
       const dragForce = 0.5 * rho * cd * af * v * v; //风阻
       return (dragForce * d) / J2KwhFactor;  // J -> kwh
     }
 
-    function getGravityEnergyKwh(distance, weight, altitudeDiff, eta=0.5) {
+    function getGravityEnergyKwh(distance, weight, altitudeDiff, eta) {
       const massKg = weight * 1000;
       const g = 9.8;
       const d = distance *  1000;
@@ -286,33 +286,45 @@
       return altitudeDiff >=0 ? slopeEnergy : slopeEnergy * eta;
     }
 
-    function getConsumption(velocity, distance, altitudeDiff, weight = 2.1, energyBase = 17.6, velocityBase = 120, cd = 0.219, af = 2.2, eta = 0.5) {
-      //计算每百公里基线滚阻(减去风阻)
-      const distanceBase = 100;
-      const baseDragEnergy = getDragEnergyKwh(velocityBase, distanceBase, cd, af);
-      const rollingEnergy = energyBase - baseDragEnergy;
+    function getRollingEnergyKwh(distance, spec) {
+      const baseUnit = 100; //km
+      if (baseRollingEnergy === 0) {
+        setBaseRollingEnergyPerKm(spec.baseSpeed, baseUnit, spec.baseKwPer100kmh, spec);
+      }
 
-      const actualRollingEnergy = rollingEnergy * distance / distanceBase;
-      const actualDragEnergy = getDragEnergyKwh(velocity, distance, cd, af);
+      return baseRollingEnergy * distance;
+    }
+
+    function setBaseRollingEnergyPerKm(velocity, distance, consumedKw, spec) {
+      // consumedKw是不包含势能消耗的平地电耗
+      const dragEnergy = getDragEnergyKwh(velocity, distance, spec.cd, spec.af);
+      baseRollingEnergy = ((consumedKw - dragEnergy) / distance).toFixed(4);
+    }
+
+    function getConsumption(velocity, distance, altitudeDiff, spec) {
+      const actualRollingEnergy = getRollingEnergyKwh(distance, spec);
+      const actualDragEnergy = getDragEnergyKwh(velocity, distance, spec.cd, spec.af);
       const horizontal = actualDragEnergy + actualRollingEnergy;
-
-      return horizontal + getGravityEnergyKwh(distance, weight, altitudeDiff, eta);
+      return horizontal + getGravityEnergyKwh(distance, spec.weight, altitudeDiff, spec.eta);
     }
 
     function reviseBaseKw(allStops, consumedEnergy, spec) {
       const actualDistance = allStops[allStops.length - 1][1];
       let prevStop = [...allStops[0]];
       let gravityEnergy = 0;
-      let averageVelocity = 0;
+      let velocity = 0;
       for (const [_, d, a, _c, v] of allStops.slice(1)) {
+        velocity += v || spec.baseSpeed;
         const altDiff = a - prevStop[2];
         const dist = d - prevStop[1];
-        averageVelocity += (dist / actualDistance) * (v || spec.speed);
-        gravityEnergy += getGravityEnergyKwh(dist, spec.weight, altDiff);
+        gravityEnergy += getGravityEnergyKwh(dist, spec.weight, altDiff, spec.eta);
         prevStop = [_, d, a, _c, v];
       }
 
-      return [(consumedEnergy - gravityEnergy) * 100 / actualDistance, averageVelocity.toFixed()];
+      const averageVelocity = velocity / (allStops.length - 1);
+      const purelyConsumed = consumedEnergy - gravityEnergy;
+      setBaseRollingEnergyPerKm(averageVelocity, actualDistance, purelyConsumed, spec);
+      return [averageVelocity, purelyConsumed / actualDistance * 100];
     }
 
     function getStandardSoc(socInt) {
@@ -350,12 +362,11 @@
       const newStops = STOPS.slice(end - 1);
       const [_, d, a] = newStops[0];
       newStops[0] = ["起点", d, a];
-      const [newBaseKw, newBaseSpeed] = reviseBaseKw(passedStops, consumedKw, spec);
-      alert(`修正电耗:${newBaseKw}@${newBaseSpeed} vs 默认电耗:${spec.baseKwPer100kmh}@${spec.baseSpeed}`);
-      const newSpec = Object.assign({...spec}, {baseKwPer100kmh: newBaseKw, baseSpeed: newBaseSpeed});
+      const oldRollingEnergy = baseRollingEnergy;
+      const [newBaseSpeed, newBaseKw] = reviseBaseKw(passedStops, consumedKw, spec);
+      alert(`修正:${newBaseKw.toFixed(1)}kwh@${newBaseSpeed} vs 默认:${spec.baseKwPer100kmh}kwh@${spec.baseSpeed}`);
 
       STOPS = newStops;
-      initialSpec = newSpec;
       initializeTable();
     }
 
@@ -472,6 +483,7 @@
     const chargeLoss = 1.08;
     const setupChargeTime = 4; 
     const speedAdjuster = 0.92; //根据高德导航预估乘以0.9得出
+    const actualSpeedAdjuster = 0.95;
 
     const defaultSpec = {
       maxKw: 61,
@@ -483,10 +495,12 @@
       chargeSpeedAfter85: 60,
       cd: 0.219,
       af: 2.2,
+      eta: 0.5,
       reserveSoc: 0.14,
     }
 
     let initialSpec = defaultSpec;
+    let baseRollingEnergy = 0;
     function getChargeSpeed(target, spec) {
       return target > 0.85 ? spec.chargeSpeedAfter85 : spec.chargeSpeedBefore85;
     }
@@ -561,7 +575,7 @@
         const distBetween = dist - d;
         const altitudeDiff = altitude - a;
         const cruisingSpeed = speed || specSpeed;
-        const currentConsumed = getConsumption(cruisingSpeed, distBetween, altitudeDiff, spec.weight, spec.baseKwPer100kmh, spec.baseSpeed, spec.cd, spec.af);
+        const currentConsumed = getConsumption(cruisingSpeed, distBetween, altitudeDiff, spec);
         prevConsumed += currentConsumed;
         if (!noCharge) {
           tmpStops.push([name, dist, altitude, plannedCharge, speed, prevConsumed]);
@@ -717,6 +731,8 @@
       }
     }
 
+    
+
     // 提交表格数据
     function submitTableData() {
       const rows = tableBody.querySelectorAll('tr');
@@ -734,6 +750,21 @@
       STOPS = newStops;
       initializeTable();
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => { // 成功回调
+        const { latitude, longitude } = position.coords;
+        alert(`${latitude}, ${longitude}`);
+      },
+      (error) => { // 失败回调
+        console.error("定位失败:", error.message);
+      },
+      { 
+        enableHighAccuracy: false, // 高精度模式
+        timeout: 10000,           // 超时10秒
+        maximumAge: 60000         // 缓存有效期
+      }
+    );
 
     // 事件监听
     submitBtn.addEventListener('click', submitTableData);
