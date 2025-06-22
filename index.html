@@ -253,6 +253,7 @@
       <div class="row single">
         <input type="text" id="initial" placeholder="初始电量0-100">
         <input type="text" id="newVelo" placeholder="出发时间">
+        <input type="text" id="newVe" placeholder="定速">
       </div>
       <div class="row">
         <input type="text" id="resetStop" placeholder="所在服务区">
@@ -489,13 +490,13 @@
     const chargeLoss = 1.08;
     const setupChargeTime = 4; 
     const speedAdjuster = 0.92; //根据高德导航预估乘以0.9得出
-    const actualSpeedAdjuster = 0.95;
+    const actualSpeedAdjuster = 0.96;
 
     const defaultSpec = {
       maxKw: 61,
       speed: 120,
       weight: 2.1,
-      baseKwPer100kmh: 17.8,
+      baseKwPer100kmh: 18,
       baseSpeed: 120,
       chargeSpeedBefore85: 70,
       chargeSpeedAfter85: 60,
@@ -560,7 +561,8 @@
 
     function planTrip(spec) {
       getInitialSoc();
-      let specSpeed = spec.speed;
+      const newSpeed = document.getElementById("newVe").value.trim();
+      let specSpeed = newSpeed && parseInt(newSpeed) || spec.speed;
       const startTime = document.getElementById("newVelo").value.trim();
 
       const { maxKw, reserveSoc } = spec;
