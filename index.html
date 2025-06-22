@@ -390,6 +390,12 @@
     let initialSoc = 1;
     let STOPS = [];
     let START = [];
+    const GPS = {
+      "大塘": [112.975, 23.432],
+      "龙甫": [112.708, 23.38],
+      "四会": [112.534, 23.432],
+
+    };
     const ROUTES = {
       gd2sjb: [
         ["起点", 0, 24],
@@ -751,13 +757,38 @@
       initializeTable();
     }
 
+    function calculateDistance(lat1, lng1, lat2, lng2) {
+      const R = 6371; // 地球半径(km)
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLng = (lng2 - lng1) * Math.PI / 180;
+      
+      const a = 
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+          Math.sin(dLng / 2) * Math.sin(dLng / 2);
+          
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c; // 返回距离(km)
+    }
+
     navigator.geolocation.getCurrentPosition(
       (position) => { // 成功回调
+        alert("定位成功");
         const { latitude, longitude } = position.coords;
-        alert(`${latitude}, ${longitude}`);
+        let dist = -1;
+        let n = "";
+        for (const name in GPS) {
+          const [lang, long] = GPS[name];
+          const d = calculateDistance(latitude, longitude, lang, long);
+          if (dist === -1 || dist > d) {
+            dist = d;
+            n = name
+          }
+        }
+        document.getElementById('resetStop').value = n;
       },
       (error) => { // 失败回调
-        console.error("定位失败:", error.message);
+        alert("定位失败");
       },
       { 
         enableHighAccuracy: false, // 高精度模式
