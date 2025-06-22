@@ -252,7 +252,7 @@
     <div class="form-group">
       <div class="row single">
         <input type="text" id="initial" placeholder="初始电量0-100">
-        <input type="text" id="newVelo" placeholder="默认巡航速度">
+        <input type="text" id="newVelo" placeholder="出发时间">
       </div>
       <div class="row">
         <input type="text" id="resetStop" placeholder="所在服务区">
@@ -535,8 +535,13 @@
       return (soc * 100).toFixed(1);
     }
 
-    function getLocaltime(tracker) {
-      return formatMinutes(tracker.totalTime);
+    function getLocaltime(startTime, totalTime) {
+      const [h, m] = (startTime || '0:00').split(':');
+      totalTime += parseInt(h) * 60 + parseInt(m);
+
+      let hours = Math.floor(totalTime / 60);
+      let minutes = parseInt((totalTime % 60));
+      return `${hours}:${minutes.toString().padStart(2, '0')}`;
     }
 
     function getInitialSoc() {
@@ -556,10 +561,7 @@
     function planTrip(spec) {
       getInitialSoc();
       let specSpeed = spec.speed;
-      const newSpeed = document.getElementById("newVelo").value.trim();
-      if (newSpeed) {
-        specSpeed = parseInt(newSpeed);
-      }
+      const startTime = document.getElementById("newVelo").value.trim();
 
       const { maxKw, reserveSoc } = spec;
       const tracker = {
@@ -623,13 +625,15 @@
 
             //修正前2服务区数据
             const time = prevPrevPlannedStop.time + chargeTime;
-            let planNode = Object.assign(prevPrevPlannedStop, { time, totalCharged: tracker.totalCharged, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
+            let planNode = Object.assign(prevPrevPlannedStop, { time, totalCharged: tracker.totalCharged, chargeTarget, chargeTime,
+              arriveTime:getLocaltime(startTime, tracker.totalTime - chargeTime),
+              localTime: getLocaltime(startTime, tracker.totalTime), new_soc: getSoc(tracker, spec) })
             plannedStops.push(planNode);
 
             //修正前一服务区数据
             tracker.totalTime += prevPlannedStop.time;
             tracker.totalUsed += prevPlannedStop.consumedKw;
-            planNode = Object.assign(prevPlannedStop, { localTime: getLocaltime(tracker), soc: getSoc(tracker, spec) })
+            planNode = Object.assign(prevPlannedStop, { localTime: getLocaltime(startTime, tracker.totalTime), soc: getSoc(tracker, spec) })
             plannedStops.push(planNode);
             tracker.remainingKw -= tracker.totalUsed;
           }
@@ -645,13 +649,16 @@
           const prevPlannedStop = plannedStops.pop();
           const [chargeTime, chargeTarget] = charge(maxChargeTo, tracker, spec);
           const time = prevPlannedStop.time + chargeTime;
-          plannedStops.push(Object.assign(prevPlannedStop, { time, totalCharged:tracker.totalCharged, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) }));
+          plannedStops.push(Object.assign(prevPlannedStop, { time, totalCharged:tracker.totalCharged, chargeTarget, chargeTime,
+            arriveTime: getLocaltime(startTime, tracker.totalTime - chargeTime),
+            localTime: getLocaltime(startTime, tracker.totalTime), new_soc: getSoc(tracker, spec) }));
         }
 
         // 更新当前服务区数据
         tracker.totalUsed += consumedKw;
         tracker.totalTime += spentTime;
-        plannedStops.push({ name, dist, time: spentTime, cruisingSpeed, consumedKw, localTime: getLocaltime(tracker), soc: getSoc(tracker, spec) });
+        plannedStops.push({ name, dist, time: spentTime, cruisingSpeed, consumedKw,
+          localTime: getLocaltime(startTime, tracker.totalTime), soc: getSoc(tracker, spec) });
 
         if (plannedCharge && plannedCharge * 100 > getSoc(tracker, spec)) {
           tracker.remainingKw = tracker.dynamicAllowed - tracker.totalUsed;
@@ -662,7 +669,9 @@
             //可安全在此服务区计划充电
             const [chargeTime, chargeTarget] = charge(plannedCharge, tracker, spec);
             const time = currentPlannedStop.time + chargeTime;
-            const planNode = Object.assign(currentPlannedStop, {time, totalCharged:tracker.totalCharged, chargeTarget, chargeTime, localTime: getLocaltime(tracker), new_soc: getSoc(tracker, spec) })
+            const planNode = Object.assign(currentPlannedStop, {time, totalCharged:tracker.totalCharged, chargeTarget, chargeTime,
+              arriveTime: getLocaltime(startTime, tracker.totalTime - chargeTime),
+              localTime: getLocaltime(startTime, tracker.totalTime), new_soc: getSoc(tracker, spec) })
             plannedStops.push(planNode);
           } else {
             alert(`无法在<<${name}>>计划充电, 到下一备选服务区<<${nextName}>>还缺${(gapEnergy/spec.maxKw*100).toFixed(1)}%的电量`);
@@ -679,8 +688,9 @@
         tmpStops.push(findStop || {name, dist, time: '*', cruisingSpeed: '*', consumedKw: 0, localTime: '*', soc: '*'});
       }
 
-      return tmpStops.map(({ name, totalCharged, dist, new_soc, soc, cruisingSpeed, consumedKw, localTime, chargeTime }) => {
-        return { name, dist, cruisingSpeed, totalCharged, consumedKw: consumedKw.toFixed(2), soc: `${soc}%`, localTime, chargeTime, new_soc }
+      return tmpStops.map(({ name, totalCharged, arriveTime, dist, new_soc, soc, cruisingSpeed, consumedKw, localTime, chargeTime }) => {
+        return { name, dist, cruisingSpeed, totalCharged, arriveTime, consumedKw: consumedKw.toFixed(2),
+          soc: `${soc}%`, localTime, chargeTime, new_soc }
       });
     }
 
@@ -698,7 +708,7 @@
         const row = document.createElement('tr');
 
         const kwCell = document.createElement('td');
-            kwCell.textContent = `${stop.name}:${stop.dist}公里 - ${stop.cruisingSpeed}km/h - ${stop.consumedKw}度(${stop.soc}) - ${stop.localTime} - ${stop.chargeTime ? stop.chargeTime + '分钟 ' + stop.new_soc + '%' : 'N/A'} - 总充电:${stop.totalCharged}`;
+            kwCell.textContent = `${stop.name}:${stop.dist}公里 - ${stop.cruisingSpeed}km/h - ${stop.consumedKw}度(${stop.soc}) - ${stop.arriveTime ? stop.arriveTime + '至' + stop.localTime : stop.localTime} - ${stop.chargeTime ? stop.chargeTime + '分钟 ' + stop.new_soc + '%' : 'N/A'} - 总充电:${stop.totalCharged}`;
         row.appendChild(kwCell);
 
         const newSocCell = document.createElement('td');
