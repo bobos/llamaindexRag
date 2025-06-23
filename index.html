@@ -584,7 +584,7 @@
         const [_, d, a] = prevStop;
         const distBetween = dist - d;
         const altitudeDiff = altitude - a;
-        const cruisingSpeed = speed || specSpeed;
+        const cruisingSpeed = speed ? (specSpeed && specSpeed < speed ? specSpeed : speed) : specSpeed;
         const currentConsumed = getConsumption(cruisingSpeed, distBetween, altitudeDiff, spec);
         prevConsumed += currentConsumed;
         if (!noCharge) {
