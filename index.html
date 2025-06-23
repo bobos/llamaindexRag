@@ -290,7 +290,7 @@
     function getRollingEnergyKwh(distance, spec) {
       const baseUnit = 100; //km
       if (baseRollingEnergy === 0) {
-        setBaseRollingEnergyPerKm(spec.baseSpeed, baseUnit, spec.baseKwPer100kmh, spec);
+        setBaseRollingEnergyPerKm(spec.baseSpeed / actualSpeedAdjuster, baseUnit, spec.baseKwPer100kmh, spec);
       }
 
       return baseRollingEnergy * distance;
@@ -500,7 +500,7 @@
       baseSpeed: 120,
       chargeSpeedBefore85: 70,
       chargeSpeedAfter85: 60,
-      cd: 0.29,
+      cd: 0.268,
       af: 2.2,
       eta: 0.5,
       reserveSoc: 0.14,
