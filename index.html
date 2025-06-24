@@ -298,13 +298,13 @@
 
     function setBaseRollingEnergyPerKm(velocity, distance, consumedKw, spec) {
       // consumedKw是不包含势能消耗的平地电耗
-      const dragEnergy = getDragEnergyKwh(velocity, distance, spec.cd, spec.af);
+      const dragEnergy = getDragEnergyKwh(velocity, distance, spec.cd, spec.width * spec.height);
       baseRollingEnergy = ((consumedKw - dragEnergy) / distance).toFixed(4);
     }
 
     function getConsumption(velocity, distance, altitudeDiff, spec) {
       const actualRollingEnergy = getRollingEnergyKwh(distance, spec);
-      const actualDragEnergy = getDragEnergyKwh(velocity, distance, spec.cd, spec.af);
+      const actualDragEnergy = getDragEnergyKwh(velocity, distance, spec.cd, spec.width * spec.height);
       const horizontal = actualDragEnergy + actualRollingEnergy;
       return horizontal + getGravityEnergyKwh(distance, spec.weight, altitudeDiff, spec.eta);
     }
@@ -490,7 +490,6 @@
     const chargeLoss = 1.08;
     const setupChargeTime = 4; 
     const speedAdjuster = 0.92; //根据高德导航预估乘以0.9得出
-    const actualSpeedAdjuster = 0.96;
 
     const defaultSpec = {
       maxKw: 61,
@@ -500,8 +499,9 @@
       baseSpeed: 120,
       chargeSpeedBefore85: 70,
       chargeSpeedAfter85: 60,
-      cd: 0.27,
-      af: 2.2,
+      cd: 0.25,
+      width: 1.875,
+      height: 1.46,
       eta: 0.5,
       reserveSoc: 0.14,
     }
