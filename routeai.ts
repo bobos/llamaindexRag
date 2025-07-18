@@ -1,4 +1,6 @@
 const KwhPer120PerKm = 17.2 * 0.01; //65%
+const gravityOverhead = 1.4;
+const gravityGain = 0.9;
 interface Step {
   step_distance: string;
   road_name: string;
@@ -21,6 +23,7 @@ interface Stop {
   distance: number; //KM
   consumedTime: number; //mins
   consumedBattery: number; //kwh
+  tags?: string[];
 }
 
 interface Path {
@@ -65,15 +68,37 @@ async function collectStops(startStation: Station, endStation: Station): Promise
   return stops;
 }
 
+enum Grav {
+  ascent = 'ascent',
+  descent = 'descent',
+  no = 'no'
+}
+
 async function getStopRecord(fromStop: Station, targetStop: Station): Promise<Stop> {
   const path: Path = await getPath(fromStop.location, targetStop.location); 
   const distKm = Math.ceil(parseInt(path.distance) / 1000);
+  const gravityLoss: Grav = await askLlm(
+    chatModel,
+    [{
+      content: `分析下从"${fromStop.name}"到"${targetStop.name}"的海拔高度变化,如果海拔爬升超过400米回答"${Grav.ascent}",如果海拔下降超过400米回答"${Grav.descent}",其他情况回答"${Grav.no}"`,
+      role: 'user'
+      }]) as Grav;
+  const tags = [];
+
+  let consumedBattery = distKm * KwhPer120PerKm;
+  if (gravityLoss !== Grav.no) {
+    tags.push(gravityLoss);
+    if (gravityLoss === Grav.ascent) consumedBattery *= gravityOverhead;
+    else consumedBattery *= gravityGain;
+  }
+  consumedBattery = parseFloat(consumedBattery.toFixed(1));
   return {
     start: fromStop.name,
     end: targetStop.name,
     distance: distKm,
     consumedTime: Math.ceil(parseInt(path.cost.duration) * 0.9 / 60),
-    consumedBattery: parseFloat((distKm * KwhPer120PerKm).toFixed(1))
+    consumedBattery,
+    tags 
   }
 }
 
@@ -144,6 +169,15 @@ async function sleep(sec: number): Promise<void> {
   });
 }
 
+enum Preset {
+  conservative = '**保守策略**:保证即使在当前规划的补能点服务不可用时,仍能保证设定的最低电量到达备用补能点.**标签**:<备用补能点名称和距离,以及到达备用补能点的预计剩余soc>',
+  aggressive = '**激进策略**:仅保证按照设定最低电量能到达规划补能点以达到效率最大化.**标签**:无',
+}
+
+async function plan(stops: Stop[], requirements: string[]): Promise<> {
+
+}
+
 async function askLlm(model: string, messages: any[]): Promise<string> {
   console.log('LLM call', messages);
   let response: any = await fetch(
@@ -164,8 +198,8 @@ async function askLlm(model: string, messages: any[]): Promise<string> {
     }
   );
   response = await response.json();
-  console.log(`LLM answer: ${response.choices[0].message.content}`);
-  return response.choices[0].message.content;
+  console.log('LLM answer', response.choices[0].message);
+  return response.choices[0].message.content.trim();
 }
 
 generateRoute('广州市黄埔区中新知识城招商雍景湾', '棉洋服务区(汕湛高速汕头方向)').then(ret => console.log(ret));
