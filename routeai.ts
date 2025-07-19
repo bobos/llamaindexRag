@@ -81,20 +81,20 @@ async function getStopRecord(fromStop: Station, targetStop: Station): Promise<St
   const path: Path = await getPath(fromStop.location, targetStop.location); 
   const distKm = Math.ceil(parseInt(path.distance) / 1000);
 
-  const gravityLoss: Grav = await askLlm(
-    chatModel,
-    [{
-      content: `分析下从"${fromStop.name}"到"${targetStop.name}"的海拔高度变化,如果海拔爬升超过400米回答"${Grav.ascent}",如果海拔下降超过400米回答"${Grav.descent}",其他情况回答"${Grav.no}"`,
-      role: 'user'
-      }]) as Grav;
-  const tags = [];
+  //const gravityLoss: Grav = await askLlm(
+  //  chatModel,
+  //  [{
+  //    content: `分析下从"${fromStop.name}"到"${targetStop.name}"的海拔高度变化,如果海拔爬升超过400米回答"${Grav.ascent}",如果海拔下降超过400米回答"${Grav.descent}",其他情况回答"${Grav.no}"`,
+  //    role: 'user'
+  //    }]) as Grav;
+  //const tags = [];
 
   let consumedBattery = distKm * KwhPer120PerKm;
-  if (gravityLoss !== Grav.no) {
-    tags.push(gravityLoss);
-    if (gravityLoss === Grav.ascent) consumedBattery *= gravityOverhead;
-    else consumedBattery *= gravityGain;
-  }
+  //if (gravityLoss !== Grav.no) {
+  //  tags.push(gravityLoss);
+  //  if (gravityLoss === Grav.ascent) consumedBattery *= gravityOverhead;
+  //  else consumedBattery *= gravityGain;
+  //}
 
   consumedBattery = parseFloat(consumedBattery.toFixed(1));
   return {
@@ -103,7 +103,6 @@ async function getStopRecord(fromStop: Station, targetStop: Station): Promise<St
     distance: distKm,
     consumedTime: Math.ceil(parseInt(path.cost.duration) * 0.9 / 60),
     consumedBattery,
-    tags
   }
 }
 
@@ -124,11 +123,12 @@ async function convLocation(address: string): Promise<string> {
 }
 
 const chatModel ='Pro/deepseek-ai/DeepSeek-R1';
+const distillChatModel = 'deepseek-ai/DeepSeek-R1-Distill-Qwen-32B';
 async function getNearestStop(location: string, from: string, to: string): Promise<Station | false> {
   const response = await request(`/v5/place/around?types=180300&location=${location}&radius=2000&sortrule=distance`);
   if (response && response.pois.length > 1) {
     const n: string = await askLlm(
-    chatModel,
+    distillChatModel,
     [{
       content: `下列哪个服务区是在从"${from}"到"${to}"的路线方向上,只用答我服务区名字不要有任何多余字符:
       ${response.pois.map((poi: any) => poi.name).join(',')}`,
@@ -139,7 +139,7 @@ async function getNearestStop(location: string, from: string, to: string): Promi
 
   if (response) {
   const answer: string = await askLlm(
-    chatModel,
+    distillChatModel,
     [{
       content: `服务区"${response.pois[0].name}"是在从"${from}"到"${to}"的路线方向上吗?只用答我Yes或者No.`,
       role: 'user'
@@ -152,6 +152,7 @@ async function getNearestStop(location: string, from: string, to: string): Promi
 async function request(path: string): Promise<any> {
   await sleep(1);
   const reqUrl = `https://restapi.amap.com${path}&key=d0e0aab6356af92b0cd0763cae27ba35&output=json`;
+  console.log(reqUrl);
   let response: any = await fetch(reqUrl);
 
   if (!response.ok) throw new Error(`network response was not ok ${response.statusText}`);
