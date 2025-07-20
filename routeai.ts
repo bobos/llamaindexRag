@@ -149,6 +149,171 @@ async function getNearestStop(location: string, from: string, to: string): Promi
   return false;
 }
 
+interface ServiceArea {
+  name: string;
+  location: string;
+  altitude: number;
+}
+
+interface DistrictArea {[district: string]: ServiceArea[]};
+
+const GuangZhouServiceStops: DistrictArea = 
+{
+  '南沙区': [
+    {name: '潭洲服务区', location: '113.401198,22.759078', altitude: 8},
+    {name: '万顷沙服务区', location: '113.636476,22.580879', altitude: 0},
+    {name: '南沙停车区', location: '113.587856,22.769409', altitude: 9},
+  ],
+  '从化区': [
+    {name: '瓦窑岗服务区', location: '113.463673,23.613520', altitude: 42},
+    {name: '从化服务区', location: '113.646944,23.610815', altitude: 76},
+    {name: '鳌头停车区', location: '113.364255,23.638190', altitude: 58},
+    {name: '上塘服务区', location: '113.505864,23.527526', altitude: 68},
+    {name: '吕田服务区', location: '113.895347,23.817703', altitude: 232},
+    {name: '木棉服务区', location: '113.505955,23.498445', altitude: 33},
+    {name: '从化南服务区', location: '113.524327,23.449385', altitude: 66},
+  ],
+  '白云区': [
+    {name: '白云服务区', location: '113.268137,23.267584', altitude: 17},
+    {name: '沙贝服务区', location: '113.195275,23.154726', altitude: 23},
+  ],
+  '增城区': [
+    {name: '正果停车区', location: '113.904996,23.458983', altitude: 50},
+    {name: '南香山服务区', location: '113.643626,23.225485', altitude: 17},
+    {name: '朱村服务区', location: '113.712358,23.239584', altitude: 24},
+    {name: '沙埔服务区', location: '113.676422,23.189259', altitude: 22},
+    {name: '沙岗驿站', location: '113.736632,23.382122', altitude: 50},
+    {name: '荔城服务区', location: '113.785421,23.238048', altitude: 19},
+    {name: '新安服务区', location: '113.578183,23.376050', altitude: 92},
+    {name: '仙村服务区', location: '113.697883,23.159462', altitude: 5},
+    {name: '河洞服务区', location: '113.808374,23.438718', altitude: 24},
+  ],
+  '花都区': [
+    {name: '花城服务区', location: '113.313125,23.503162', altitude: 67},
+    {name: '炭步服务区', location: '113.067509,23.311997', altitude: 10},
+  ],
+  '番禺区': [
+    {name: '官桥服务区', location: '113.457426,22.987955', altitude: 6},
+    {name: '金山服务区', location: '113.265947,22.970051', altitude: 10},
+  ],
+  '黄埔区': [
+    {name: '仓头服务区', location: '113.551412,23.124518', altitude: 8},
+    {name: '中新服务区', location: '113.602678,23.310739', altitude: 13},
+    {name: '火村服务区', location: '113.489894,23.153703', altitude: 23},
+    {name: '和龙服务区', location: '113.419987,23.257411', altitude: 108},
+  ],
+  '天河区': [
+    {name: '黄村服务区', location: '113.403143,23.144632', altitude: 9},
+    {name: '广氮服务区', location: '113.384020,23.151452', altitude: 15},
+  ],
+  '海珠区': [
+    {name: '赤沙加油站', location: '113.350397,23.086840', altitude: 9},
+    {name: '华洲加油站', location: '113.344331,23.062008', altitude: 9},
+  ]
+}
+
+const FoShanServiceStops: DistrictArea = 
+{
+  "三水区": [
+    {name: '三水服务区', location: '112.896063,23.244388', altitude: 15},
+    {name: '大塘服务区', location: '112.980172,23.429447', altitude: 11},
+    {name: '范湖服务区', location: '113.027106,23.338264', altitude: 7}
+  ],
+  "南海区": [
+    {name: '沙涌加油站', location: '113.163602,23.137643', altitude: 6},
+    {name: '丹灶服务区', location: '112.900160,23.043781', altitude: 15},
+    {name: '狮山加油站', location: '112.995906,23.138756', altitude: 9}
+  ],
+  "高明区": [
+    {name: '明城停车区', location: '112.695781,22.946388', altitude: 32},
+    {name: '更合停车区', location: '112.499981,22.757366', altitude: 43},
+    {name: '松岗服务区', location: '112.824118,22.950590', altitude: 14}
+  ],
+  "顺德区": [
+    {name: '勒流服务区', location: '113.164969,22.840974', altitude: 10},
+    {name: '顺德服务区', location: '113.270005,22.917469', altitude: 10},
+    {name: '冲鹤服务区', location: '113.198885,22.781098', altitude: 13}
+  ],
+  "禅城区": [
+    {name: '罗格服务区', location: '113.011565,22.990880', altitude: 11}
+  ]
+}
+const ZhaoQingServiceStops: DistrictArea =
+{
+  "广宁县": [
+    {name: '广宁服务区', location: '112.437496,23.520699', altitude: 34},
+  ],
+  "鼎湖区": [
+    {name: '鼎湖山服务区', location: '112.627663,23.247110', altitude: 24},
+    {name: '鼎湖服务区', location: '112.695005,23.216631', altitude: 9}
+  ],
+  "封开县": [
+    {name: '金装服务区', location: '111.874010,23.775097', altitude: 74},
+    {name: '封开服务区', location: '111.555619,23.351069', altitude: 47},
+    {name: '南丰停车区', location: '111.807659,23.635221', altitude: 110},
+    {name: '罗董服务区', location: '111.646208,23.355565', altitude: 88}
+  ],
+  "高要区": [
+    {name: '水南服务区', location: '112.392459,23.291416', altitude: 59},
+    {name: '大湾服务区', location: '112.352400,23.044584', altitude: 20},
+    {name: '蚬岗服务区', location: '112.633448,23.049731', altitude: 26},
+    {name: '笋围停车区', location: '112.342382,23.183696', altitude: 20}
+  ],
+  "德庆县": [
+    {name: '宾村停车区', location: '111.719530,23.226553', altitude: 135},
+    {name: '高良停车区', location: '111.909494,23.236876', altitude: 75},
+    {name: '播植服务区', location: '112.088516,23.262082', altitude: 99},
+  ],
+  "怀集县": [
+    {name: '怀集服务区', location: '112.230754,23.976639', altitude: 119},
+    {name: '怀城服务区', location: '112.221792,23.812410', altitude: 52},
+    {name: '连麦停车区', location: '112.116338,24.022175', altitude: 81},
+    {name: '梁村停车区', location: '111.997930,23.968522', altitude: 86},
+  ],
+  "四会市": [
+    {name: '四会服务区', location: '112.539873,23.429049', altitude: 14},
+    {name: '地豆服务区', location: '112.688066,23.566828', altitude: 43},
+    {name: '龙甫服务区', location: '112.714164,23.377671', altitude: 15},
+    {name: '江谷停车区', location: '112.611892,23.447889', altitude: 72}
+  ]
+};
+const HeZhouServiceStops: DistrictArea =
+{
+  "平桂区": [
+    {name: '平桂服务区', location: '111.469749,24.494844', altitude: 169},
+  ],
+  "钟山县": [
+    {name: '清塘服务区', location: '111.123752,24.352925', altitude: 190},
+    {name: '钟山服务区', location: '111.276905,24.605468', altitude: 142},
+    {name: '同古服务区', location: '111.185664,24.394484', altitude: 176}
+  ],
+  "八步区": [
+    {name: '大桂山停车区', location: '111.695203,24.162302', altitude: 176},
+    {name: '信都服务区', location: '111.708496,24.047655', altitude: 100},
+    {name: '八步服务区', location: '111.715281,24.404130', altitude: 186},
+    {name: '白马服务区', location: '111.768104,24.020730', altitude: 76},
+    {name: '贺州服务区', location: '111.644819,24.347130', altitude: 141}
+  ],
+  "昭平县": [
+    {name: '昭平服务区', location: '110.815686,24.192409', altitude: 78},
+    {name: '黄姚停车区', location: '111.219973,24.175408', altitude: 194},
+    {name: '富罗服务区', location: '111.159073,24.035602', altitude: 80}
+  ],
+  "富川瑶族自治县": [
+    {name: '富川服务区', location: '111.272163,24.998497', altitude: 325}
+  ]
+}; 
+const GuiLinServiceStops: DistrictArea = {};
+const LiuZhouServiceStops: DistrictArea = {};
+const ServiceStops: {[city: string]: DistrictArea} = {
+  "广州": GuangZhouServiceStops,
+  "佛山": FoShanServiceStops,
+  "肇庆": ZhaoQingServiceStops,
+  "贺州": HeZhouServiceStops,
+  "桂林": GuiLinServiceStops,
+  "柳州": LiuZhouServiceStops
+}
+
 async function request(path: string): Promise<any> {
   await sleep(1);
   const reqUrl = `https://restapi.amap.com${path}&key=d0e0aab6356af92b0cd0763cae27ba35&output=json`;
@@ -244,9 +409,53 @@ async function askLlm(model: string, messages: any[]): Promise<string> {
   return response.choices[0].message.content.trim();
 }
 
-generateRoute(
-  '广州市黄埔区中新知识城招商雍景湾',
-  '棉洋服务区(汕湛高速汕头方向)',
-  '6:30AM', '85%', '8%', '61度',
-  [Preset.aggressive, Preset.dinnerTimeCharge],
-  '在午餐充电时可以充到100%').then(ret => console.log(ret));
+//generateRoute(
+//  '广州市黄埔区中新知识城招商雍景湾',
+//  '棉洋服务区(汕湛高速汕头方向)',
+//  '6:30AM', '85%', '8%', '61度',
+//  [Preset.aggressive, Preset.dinnerTimeCharge],
+//  '在午餐充电时可以充到100%').then(ret => console.log(ret));
+
+async function r(city: string, pageNum: number): Promise<any> {
+  const reqUrl = `https://restapi.amap.com/v5/place/text?types=180300&key=d0e0aab6356af92b0cd0763cae27ba35&output=json&region=${city}&page_size=25&page_num=${pageNum}`;
+  let response: any = await fetch(reqUrl);
+
+  if (!response.ok) throw new Error(`network response was not ok ${response.statusText}`);
+
+  try {
+    response = await response.json();
+    if (response && response.count > 0) {
+      return response.pois;
+    }
+    return false;
+  } catch(e) {
+    throw e;
+  }
+}
+
+function shuffleMap(array: any[]) {
+  return array
+    .map(v => ({ v, r: Math.random() }))
+    .sort((a, b) => a.r - b.r)
+    .map(item => item.v);
+}
+
+async function collectService(city: string, pageNum: number, allService: string[]): Promise<void> {
+  let ret = await r(city, pageNum);
+  if (!ret) {
+    let all: string[] = [];
+    let stops: any = {};
+    const pois: any[] = shuffleMap(allService);
+    pois.forEach(poi => {
+      const name = poi.name.split('(')[0];
+      if (!all.includes(name)) {
+        all.push(name);
+        let sub = stops[poi.adname];
+        const item = `{name: '${name}', location: '${poi.location}', altitude: }`;
+        if (!sub) stops[poi.adname] = [item]; else sub.push(item);
+      }
+    });
+    console.log(stops);
+  }
+  await collectService(city, pageNum+1, allService.concat(ret));
+}
