@@ -303,8 +303,102 @@ const HeZhouServiceStops: DistrictArea =
     {name: '富川服务区', location: '111.272163,24.998497', altitude: 325}
   ]
 }; 
-const GuiLinServiceStops: DistrictArea = {};
-const LiuZhouServiceStops: DistrictArea = {};
+const GuiLinServiceStops: DistrictArea = 
+{
+  "永福县": [
+    {name: '百寿停车区', location: '109.724990,25.083270', altitude: 247},
+    {name: '永福服务区', location: '110.010994,25.037666', altitude: 183},
+  ],
+  "临桂区": [
+    {name: '五通服务区', location: '110.096766,25.410706', altitude: 236},
+    {name: '桂林服务区', location: '110.120394,25.217437', altitude: 165},
+    {name: '宛田服务区', location: '110.049585,25.626338', altitude: 363},
+    {name: '会仙服务区', location: '110.255057,25.089015', altitude: 137},
+    {name: '桂林两江服务区', location: '109.981355,25.151762', altitude: 186},
+    {name: '东山停车区', location: '110.327517,24.925521', altitude: 124},
+  ],
+  "平乐县": [
+    {name: '同安停车区', location: '110.981447,24.543884', altitude: 150},
+    {name: '平乐服务区', location: '110.720951,24.642464', altitude: 218},
+    {name: '平乐停车区', location: '110.660916,24.684125', altitude: 138}
+  ],
+  "资源县": [
+    {name: '中峰服务区', location: '110.610384,25.843576', altitude: 497},
+    {name: '八角寨服务区', location: '110.748699,26.226159', altitude: 432}
+  ],
+  "灌阳县": [
+    {name: '新圩服务区', location: '111.115495,25.611985', altitude: 435},
+    {name: '灌阳服务区', location: '111.182004,25.659212', altitude: 245},
+    {name: '新街停车区', location: '111.103910,25.428395', altitude: 283},
+    {name: '黄关服务区', location: '110.995157,25.314831', altitude: 315}
+  ],
+  "七星区": [
+    {name: '尧山服务区', location: '110.356147,25.265402', altitude: 142}
+  ],
+  "兴安县": [
+    {name: '兴安停车区', location: '110.652837,25.647829', altitude: 219},
+    {name: '溶江服务区', location: '110.512468,25.584283', altitude: 237}
+  ],
+  "灵川县": [
+    {name: '灵川服务区', location: '110.298757,25.381080', altitude: 176},
+  ],
+  "阳朔县": [
+    {name: '高田服务区', location: '110.431986,24.749543', altitude: 133},
+  ],
+  "全州县": [
+    {name: '全州停车区', location: '110.991880,25.893511', altitude: 174},
+    {name: '凤凰服务区', location: '110.818185,25.726099', altitude: 203},
+    {name: '石塘停车区', location: '111.014039,25.706926', altitude: 273},
+    {name: '全州服务区', location: '111.102540,26.010079', altitude: 185}
+  ],
+  "龙胜各族自治县": [
+    {name: '龙胜服务区', location: '109.946363,25.787543', altitude: 242},
+  ],
+  "荔浦市": [
+    {name: '荔浦服务区', location: '110.353673,24.532750', altitude: 177},
+    {name: '杜莫服务区', location: '110.439902,24.349638', altitude: 287}
+  ],
+  "恭城瑶族自治县": [
+    {name: '恭城服务区', location: '110.815611,24.886585', altitude: 166},
+    {name: '栗木停车区', location: '110.900364,25.090461', altitude: 188}
+  ]
+} 
+
+const LiuZhouServiceStops: DistrictArea = 
+{
+  "融水苗族自治县": [
+    {name: '融水服务区', location: '109.288116,25.165671', altitude: 151},
+    {name: '和睦服务区', location: '109.203820,24.915379', altitude: 110}
+  ],
+  "柳南区": [
+    {name: '柳北服务区', location: '109.305336,24.409348', altitude: 105}
+  ],
+  "三江侗族自治县": [
+    {name: '三江南服务区', location: '109.531378,25.719468', altitude: 206},
+    {name: '三江北服务区', location: '109.634494,25.826220', altitude: 192}
+  ],
+  "融安县": [
+    {name: '融安服务区', location: '109.380708,25.250808', altitude: 146},
+    {name: '沙子服务区', location: '109.455885,24.977038', altitude: 299}
+  ],
+  "鹿寨县": [
+    {name: '鹿寨服务区', location: '109.733880,24.454081', altitude: 99},
+    {name: '寨沙服务区', location: '110.018328,24.475256', altitude: 161},
+    {name: '波寨服务区', location: '109.889772,24.735192', altitude: 171}
+  ],
+  "柳江区": [
+    {name: '木团停车区', location: '109.430470,24.120566', altitude: 126},
+    {name: '新兴服务区', location: '109.401211,24.133533', altitude: 130},
+  ],
+  "鱼峰区": [
+    {name: '柳州服务区', location: '109.590193,24.229755', altitude: 94}
+  ],
+  "柳城县": [
+    {name: '柳城东服务区', location: '109.282548,24.618355', altitude: 147},
+    {name: '柳城服务区', location: '109.075045,24.522678', altitude: 183}
+  ]
+}
+
 const ServiceStops: {[city: string]: DistrictArea} = {
   "广州": GuangZhouServiceStops,
   "佛山": FoShanServiceStops,
