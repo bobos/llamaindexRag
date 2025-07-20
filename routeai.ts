@@ -1,8 +1,8 @@
 const KwhPer120PerKm = 17.2 * 0.01; //65%
-const gravityOverhead = 1.4;
-const gravityGain = 0.9;
+const Weight = 2.1;
 const chargeEffe = 0.92;
 const chargeSpeed = 70;
+const J2KwhFactor = 3.6e6;
 
 interface Step {
   step_distance: string;
@@ -12,12 +12,23 @@ interface Step {
     toll_distance: string;
     toll_road: string;
   };
+  cities: City[];
   polyline: string;
+}
+
+interface City {
+  city: string;
+  districts: District[]
+}
+
+interface District {
+  name: string;
 }
 
 interface Station {
   location: string;
   name: string;
+  altitude?: number;
 }
 
 interface Stop {
@@ -38,6 +49,18 @@ interface Path {
   steps: Step[];
 }
 
+function getGravityEnergyKwh(distance: number, weight: number, altitudeDiff: number, eta=0.4): number {
+  const massKg = weight * 1000;
+  const g = 9.8;
+  const d = distance *  1000;
+  const slope = altitudeDiff / d;
+  const slopeRad = Math.atan(slope);
+
+  const slopeForce = massKg * g * Math.sin(slopeRad);
+  const slopeEnergy = 1.5 * (slopeForce * d) / J2KwhFactor; // 1.2为精准系数，考虑到路途中起伏难测，加到1.5
+  return altitudeDiff >=0 ? slopeEnergy : slopeEnergy * eta;
+}
+
 async function generateRoute(startAddress: string, destAddres: string, startTime: string, maxSoc: string, minSoc: string, maxBattery: string, presets: Preset[], otherRequirement: string): Promise<Stop[]> {
   const stops = await collectStops(
   {location: await convLocation(startAddress), name: startAddress},
@@ -52,13 +75,13 @@ async function collectStops(startStation: Station, endStation: Station): Promise
 
   for (const step of path.steps) {
     const distance = parseInt(step.step_distance);
-    if (!step.cost.toll_road || distance < 1000) continue;
+    if (!step.cost.toll_road || distance < 500) continue;
 
     const polylines: string[] = step.polyline.split(';').splice(1);
-    const incre = Math.floor(polylines.length / Math.floor(distance / 4000)); // 4KM
+    const incre = Math.floor(polylines.length / Math.floor(distance / 1000)); // 1KM
     for (let index=0; index < polylines.length; index += incre) {
-      const ret = await getNearestStop(polylines[index], startStation.name, endStation.name);
-      if (ret && ret.name !== prevStation.name) {
+      const ret: Station|undefined = getNearestStop(polylines[index], step.cities);
+      if (ret !== undefined && ret.name !== prevStation.name) {
         stops.push(await getStopRecord(prevStation, ret));
         prevStation = ret;
       }
@@ -72,29 +95,22 @@ async function collectStops(startStation: Station, endStation: Station): Promise
   return stops;
 }
 
-enum Grav {
-  ascent = 'ascent',
-  descent = 'descent',
-  no = 'no'
-}
 async function getStopRecord(fromStop: Station, targetStop: Station): Promise<Stop> {
   const path: Path = await getPath(fromStop.location, targetStop.location); 
   const distKm = Math.ceil(parseInt(path.distance) / 1000);
-
-  //const gravityLoss: Grav = await askLlm(
-  //  chatModel,
-  //  [{
-  //    content: `分析下从"${fromStop.name}"到"${targetStop.name}"的海拔高度变化,如果海拔爬升超过400米回答"${Grav.ascent}",如果海拔下降超过400米回答"${Grav.descent}",其他情况回答"${Grav.no}"`,
-  //    role: 'user'
-  //    }]) as Grav;
-  //const tags = [];
+  const tags: string[] = [];
 
   let consumedBattery = distKm * KwhPer120PerKm;
-  //if (gravityLoss !== Grav.no) {
-  //  tags.push(gravityLoss);
-  //  if (gravityLoss === Grav.ascent) consumedBattery *= gravityOverhead;
-  //  else consumedBattery *= gravityGain;
-  //}
+  if (fromStop.altitude !== undefined && targetStop.altitude !== undefined) {
+    const altDiff = targetStop.altitude - fromStop.altitude;
+    consumedBattery += getGravityEnergyKwh(distKm, Weight, altDiff);
+    if (altDiff > 300) {
+      tags.push('海拔超300米爬坡');
+    }
+    if (altDiff < -300) {
+      tags.push('海拔超300米下坡');
+    }
+  }
 
   consumedBattery = parseFloat(consumedBattery.toFixed(1));
   return {
@@ -103,11 +119,12 @@ async function getStopRecord(fromStop: Station, targetStop: Station): Promise<St
     distance: distKm,
     consumedTime: Math.ceil(parseInt(path.cost.duration) * 0.9 / 60),
     consumedBattery,
+    tags
   }
 }
 
 async function getPath(originLoc: string, destLoc: string): Promise<Path> {
-  const response = await request(`/v5/direction/driving?origin=${originLoc}&destination=${destLoc}&strategy=32&cartype=1&show_fields=cost,polyline`);
+  const response = await request(`/v5/direction/driving?origin=${originLoc}&destination=${destLoc}&strategy=32&cartype=1&show_fields=cost,polyline,cities`);
   if (!response) {
     throw new Error(`failed to path from ${originLoc} to ${destLoc}`);
   }
@@ -122,40 +139,52 @@ async function convLocation(address: string): Promise<string> {
   return response.geocodes[0].location;
 }
 
+/*
+"cities": [
+        {
+          "adcode": "441600",
+          "citycode": "0762",
+          "city": "河源市",
+          "districts": [
+            {
+              "name": "紫金县",
+              "adcode": "441621"
+            }
+          ]
+        },
+        ,
+        {
+          "adcode": "441400",
+          "citycode": "0753",
+          "city": "梅州市",
+          "districts": [
+            {
+              "name": "五华县",
+              "adcode": "441424"
+            }
+          ]
+        }
+        */
 const chatModel ='Pro/deepseek-ai/DeepSeek-R1';
-const distillChatModel = 'deepseek-ai/DeepSeek-R1-Distill-Qwen-32B';
-async function getNearestStop(location: string, from: string, to: string): Promise<Station | false> {
-  const response = await request(`/v5/place/around?types=180300&location=${location}&radius=2000&sortrule=distance`);
-  if (response && response.pois.length > 1) {
-    const n: string = await askLlm(
-    distillChatModel,
-    [{
-      content: `下列哪个服务区是在从"${from}"到"${to}"的路线方向上,只用答我服务区名字不要有任何多余字符:
-      ${response.pois.map((poi: any) => poi.name).join(',')}`,
-      role: 'user'
-      }]);
-    return response.pois.find((poi: any) => poi.name === n);
-  }
+function getNearestStop(location: string, cities: City[]): Station | undefined {
+  for (const city of cities) {
+    const stops: DistrictArea | undefined = ServiceStops[city.city];
+    if (!stops) throw new Error(`没有服务数据: ${city.city}`);
 
-  if (response) {
-  const answer: string = await askLlm(
-    distillChatModel,
-    [{
-      content: `服务区"${response.pois[0].name}"是在从"${from}"到"${to}"的路线方向上吗?只用答我Yes或者No.`,
-      role: 'user'
-      }]);
-  return answer === 'Yes' && response.pois[0];
+    for (const district of city.districts) {
+      const sa: Station[] = stops[district.name];
+      if (!sa) throw new Error(`没有服务数据: ${district.name}`);
+      for (const s of sa) {
+        if (calculateDistance(location, s.location) <= 500) { //小于500米
+          return s;
+        }
+      }
+    }
   }
-  return false;
+  return;
 }
 
-interface ServiceArea {
-  name: string;
-  location: string;
-  altitude: number;
-}
-
-interface DistrictArea {[district: string]: ServiceArea[]};
+interface DistrictArea {[district: string]: Station[]};
 
 const GuangZhouServiceStops: DistrictArea = 
 {
@@ -503,12 +532,12 @@ async function askLlm(model: string, messages: any[]): Promise<string> {
   return response.choices[0].message.content.trim();
 }
 
-//generateRoute(
-//  '广州市黄埔区中新知识城招商雍景湾',
-//  '棉洋服务区(汕湛高速汕头方向)',
-//  '6:30AM', '85%', '8%', '61度',
-//  [Preset.aggressive, Preset.dinnerTimeCharge],
-//  '在午餐充电时可以充到100%').then(ret => console.log(ret));
+generateRoute(
+  '广州市黄埔区中新知识城招商雍景湾',
+  '三江北',
+  '6:30AM', '85%', '8%', '61度',
+  [Preset.aggressive, Preset.dinnerTimeCharge],
+  '在午餐充电时可以充到100%').then(ret => console.log(ret));
 
 async function r(city: string, pageNum: number): Promise<any> {
   const reqUrl = `https://restapi.amap.com/v5/place/text?types=180300&key=d0e0aab6356af92b0cd0763cae27ba35&output=json&region=${city}&page_size=25&page_num=${pageNum}`;
@@ -532,6 +561,34 @@ function shuffleMap(array: any[]) {
     .map(v => ({ v, r: Math.random() }))
     .sort((a, b) => a.r - b.r)
     .map(item => item.v);
+}
+
+function calculateDistance(loc1: string, loc2: string): number {
+  const [long1, lati1] = loc1.split(',');
+  const [long2, lati2] = loc2.split(',');
+  const lon1: number = parseFloat(long1);
+  const lon2: number = parseFloat(long2);
+  const lat1: number = parseFloat(lati1);
+  const lat2: number = parseFloat(lati2);
+
+  // 地球平均半径（单位：米）
+  const R = 6371000; 
+
+  // 将十进制度数转换为弧度
+  const rad = (angle: number): number => angle * Math.PI / 180;
+  const φ1 = rad(lat1);
+  const φ2 = rad(lat2);
+  const Δφ = rad(lat2 - lat1);
+  const Δλ = rad(lon2 - lon1);
+
+  // 应用 Haversine 公式
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  
+  // 计算距离（单位：米）
+  return Math.floor(R * c);
 }
 
 async function collectService(city: string, pageNum: number, allService: string[]): Promise<void> {
