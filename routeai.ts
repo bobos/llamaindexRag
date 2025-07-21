@@ -505,10 +505,10 @@ please assist the EV driver to make a recharging plan based on below info:
 - Charging overhead: ${chargeEffe}, meaning per 1kwh from the charger only ${chargeEffe}kwh can be converted to car
 
 **route data structure info**:
-- the route consists of a list of steps, each step following below JSON structure:{start: <name of the start service stop>; end: <name of the end service stop>; distance: <distance between start and end in KM>; consumedTime: <driving time from start to end in mins>; consumedBattery: <consumed battery from start to end in Kwh>;}
+- the route consists of a list of steps, each step following below JSON structure:{start: <name of the start service stop>, end: <name of the end service stop>, consumedTime: <driving time from start to end in mins>, consumedBattery: <consumed battery from start to end in Kwh>}
 - car can be recharged at any of these service stops
 **route data**:
-${JSON.stringify(stops)}
+${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) => {return {start, end, consumedTime, consumedBattery}}))}
 
 **driver's selected requirements(selected requirement includes both requirement and related tags, tags can be put on the matching service stops)**:
 - ${presets.join('\n- ')}
@@ -519,7 +519,7 @@ ${JSON.stringify(stops)}
 
 **output requirement**:
 - generate the recharging plan by strictly follow below format:
-[{fromStop: <journey start point or previous recharging service stop>; arrivalStop: <current recharging service stop>; distance: <distance between in KM>; arrivalTime: <arrival time>, departureTime: <departure time>, consumedTime: <driving time in mins>; consumedBattery: <consumed battery in Kwh>, chargeDetail: <planned recharging details>, tags:[<tags matching current service stop>]}]
+[{fromStop: <journey start point or previous recharging service stop>, arrivalStop: <current recharging service stop>, arrivalTime: <arrival time>, departureTime: <departure time>, chargeDetail: <planned recharging details>, tags:[<tags matching current service stop>]}]
   `;
   const answer: string = await askLlm(
     chatModel,
