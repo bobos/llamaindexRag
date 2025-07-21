@@ -489,7 +489,9 @@ ${JSON.stringify(stops)}
 enum Preset {
   conservative = '**conservative**:make sure there is always a backup service stop to recharge when currently planned service stop is out of service, make sure soc is above the minimal allowed soc when car arrives the backup service stop.**tag**:<backup service stop name, remaining soc when arrival at backup service stop>',
   aggressive = '**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:No',
-  dinnerTimeCharge = '**recharging at meal time**:always prioritize recharging during meal time(breakfast,lunch, dinner).**tag**:breakfast,lunch,dinner',
+  breakfastCharge = '**recharging at breakfast time**:prioritize recharging during breakfast time.**tag**:breakfast charge',
+  lunchCharge = '**recharging at lunch time**:prioritize recharging during lunch time.**tag**:lunch charge',
+  dinnerCharge = '**recharging at dinner time**:prioritize recharging during dinner time.**tag**:dinner charge',
   avoidExpensiveWindow = '**avoid expensive charging window**:try to avoid recharging at 11:00 - 13:00, 17:00 - 23:00. **tag**:expensive charging,cheap charging',
 }
 
@@ -559,8 +561,8 @@ generateRoute(
   '广州市黄埔区中新知识城招商雍景湾',
   '桂林西站',
   '6:30AM', '85%', '8%', '61Kwh',
-  [Preset.aggressive, Preset.dinnerTimeCharge],
-  'recharge the car till 100% if lunch time').then(ret => console.log(ret));
+  [Preset.aggressive, Preset.lunchCharge],
+  'recharge the car till 100% if lunch time and make sure at least 15% when arrival at destination').then(ret => console.log(ret));
 
 async function r(city: string, pageNum: number): Promise<any> {
   const reqUrl = `https://restapi.amap.com/v5/place/text?types=180300&key=d0e0aab6356af92b0cd0763cae27ba35&output=json&region=${city}&page_size=25&page_num=${pageNum}`;
