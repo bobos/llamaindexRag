@@ -65,6 +65,7 @@ async function generateRoute(startAddress: string, destAddres: string, startTime
   const stops = await collectStops(
   {location: await convLocation(startAddress), name: startAddress},
   {location: await convLocation(destAddres), name: destAddres});
+  console.log(stops);
   return await plan(stops, startTime, maxSoc, minSoc, maxBattery, presets, otherRequirement);
 }
 
@@ -78,7 +79,7 @@ async function collectStops(startStation: Station, endStation: Station): Promise
     if (!step.cost.toll_road || distance < 500) continue;
 
     const polylines: string[] = step.polyline.split(';').splice(1);
-    const incre = Math.floor(polylines.length / Math.floor(distance / 1000)); // 1KM
+    const incre = Math.floor(polylines.length / Math.floor(distance / 2000)); // scan at every 2KM
     for (let index=0; index < polylines.length; index += incre) {
       const ret: Station|undefined = getNearestStop(polylines[index], step.cities);
       if (ret !== undefined && ret.name !== prevStation.name) {
@@ -139,32 +140,6 @@ async function convLocation(address: string): Promise<string> {
   return response.geocodes[0].location;
 }
 
-/*
-"cities": [
-        {
-          "adcode": "441600",
-          "citycode": "0762",
-          "city": "河源市",
-          "districts": [
-            {
-              "name": "紫金县",
-              "adcode": "441621"
-            }
-          ]
-        },
-        ,
-        {
-          "adcode": "441400",
-          "citycode": "0753",
-          "city": "梅州市",
-          "districts": [
-            {
-              "name": "五华县",
-              "adcode": "441424"
-            }
-          ]
-        }
-        */
 const chatModel ='Pro/deepseek-ai/DeepSeek-R1';
 function getNearestStop(location: string, cities: City[]): Station | undefined {
   for (const city of cities) {
@@ -173,7 +148,7 @@ function getNearestStop(location: string, cities: City[]): Station | undefined {
 
     for (const district of city.districts) {
       const sa: Station[] = stops[district.name];
-      if (!sa) throw new Error(`没有服务数据: ${district.name}`);
+      if (!sa) continue;
       for (const s of sa) {
         if (calculateDistance(location, s.location) <= 500) { //小于500米
           return s;
@@ -429,12 +404,12 @@ const LiuZhouServiceStops: DistrictArea =
 }
 
 const ServiceStops: {[city: string]: DistrictArea} = {
-  "广州": GuangZhouServiceStops,
-  "佛山": FoShanServiceStops,
-  "肇庆": ZhaoQingServiceStops,
-  "贺州": HeZhouServiceStops,
-  "桂林": GuiLinServiceStops,
-  "柳州": LiuZhouServiceStops
+  "广州市": GuangZhouServiceStops,
+  "佛山市": FoShanServiceStops,
+  "肇庆市": ZhaoQingServiceStops,
+  "贺州市": HeZhouServiceStops,
+  "桂林市": GuiLinServiceStops,
+  "柳州市": LiuZhouServiceStops
 }
 
 async function request(path: string): Promise<any> {
@@ -462,6 +437,7 @@ async function sleep(sec: number): Promise<void> {
   });
 }
 
+/*
 enum Preset {
   conservative = '**保守策略**:保证即使在当前规划的补能点服务不可用时,仍能保证设定的最低电量到达备用补能点.**标签**:<备用补能点名称和距离,以及到达备用补能点的预计剩余soc>',
   aggressive = '**激进策略**:仅保证按照设定最低电量能到达规划补能点以达到效率最大化.**标签**:无',
@@ -507,6 +483,53 @@ ${JSON.stringify(stops)}
 
   return JSON.parse(answer);
 }
+*/
+
+
+enum Preset {
+  conservative = '**conservative**:make sure there is always a backup service stop to recharge when currently planned service stop is out of service, make sure soc is above the minimal allowed soc when car arrives the backup service stop.**tag**:<backup service stop name, remaining soc when arrival at backup service stop>',
+  aggressive = '**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:No',
+  dinnerTimeCharge = '**recharging at meal time**:always prioritize recharging during meal time(breakfast,lunch, dinner).**tag**:breakfast,lunch,dinner',
+  avoidExpensiveWindow = '**avoid expensive charging window**:try to avoid recharging at 11:00 - 13:00, 17:00 - 23:00. **tag**:expensive charging,cheap charging',
+}
+
+async function plan(stops: Stop[], startTime: string, maxSoc: string, minSoc: string, maxBattery: string, presets: Preset[], otherRequirement: string): Promise<any> {
+  const prompt = `
+please assist the EV driver to make a recharging plan based on below info:
+**basic info**:
+- departure time: ${startTime}
+- EV full battery: ${maxBattery}
+- Max recharge to : ${maxSoc}
+- Minimal allowed Soc: ${minSoc}
+- Charging rate: ${chargeSpeed}Kwh per hour
+- Charging overhead: ${chargeEffe}, meaning per 1kwh from the charger only ${chargeEffe}kwh can be converted to car
+
+**route data structure info**:
+- the route consists of a list of steps, each step following below JSON structure:{start: <name of the start service stop>; end: <name of the end service stop>; distance: <distance between start and end in KM>; consumedTime: <driving time from start to end in mins>; consumedBattery: <consumed battery from start to end in Kwh>;}
+- car can be recharged at any of these service stops
+**route data**:
+${JSON.stringify(stops)}
+
+**driver's selected requirements(selected requirement includes both requirement and related tags, tags can be put on the matching service stops)**:
+- ${presets.join('\n- ')}
+**driver's freely input requirements**:
+- freely input requirement takes prioritiy over the selected requirements
+- understand and try best to fulfill the input requirement, and create tag for them if applicable, each tag should not exceed 5 words 
+- freely input requirements are following: ${otherRequirement}
+
+**output requirement**:
+- generate the recharging plan by strictly follow below format:
+[{fromStop: <journey start point or previous recharging service stop>; arrivalStop: <current recharging service stop>; distance: <distance between in KM>; arrivalTime: <arrival time>, departureTime: <departure time>, consumedTime: <driving time in mins>; consumedBattery: <consumed battery in Kwh>, chargeDetail: <planned recharging details>, tags:[<tags matching current service stop>]}]
+  `;
+  const answer: string = await askLlm(
+    chatModel,
+    [{
+      content: prompt,
+      role: 'user'
+      }]);
+
+  return JSON.parse(answer);
+}
 
 async function askLlm(model: string, messages: any[]): Promise<string> {
   console.log('LLM call', messages);
@@ -534,10 +557,10 @@ async function askLlm(model: string, messages: any[]): Promise<string> {
 
 generateRoute(
   '广州市黄埔区中新知识城招商雍景湾',
-  '三江北',
-  '6:30AM', '85%', '8%', '61度',
+  '桂林西站',
+  '6:30AM', '85%', '8%', '61Kwh',
   [Preset.aggressive, Preset.dinnerTimeCharge],
-  '在午餐充电时可以充到100%').then(ret => console.log(ret));
+  'recharge the car till 100% if lunch time').then(ret => console.log(ret));
 
 async function r(city: string, pageNum: number): Promise<any> {
   const reqUrl = `https://restapi.amap.com/v5/place/text?types=180300&key=d0e0aab6356af92b0cd0763cae27ba35&output=json&region=${city}&page_size=25&page_num=${pageNum}`;
