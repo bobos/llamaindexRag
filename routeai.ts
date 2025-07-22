@@ -79,7 +79,7 @@ async function collectStops(startStation: Station, endStation: Station): Promise
     if (!step.cost.toll_road || distance < 500) continue;
 
     const polylines: string[] = step.polyline.split(';').splice(1);
-    const incre = Math.floor(polylines.length / Math.floor(distance / 2000)); // scan at every 2KM
+    const incre = Math.floor(polylines.length / Math.floor(distance / 5000)); // scan at every 5KM
     for (let index=0; index < polylines.length; index += incre) {
       const ret: Station|undefined = getNearestStop(polylines[index], step.cities);
       if (ret !== undefined && ret.name !== prevStation.name) {
@@ -140,7 +140,13 @@ async function convLocation(address: string): Promise<string> {
   return response.geocodes[0].location;
 }
 
-const chatModel ='Pro/deepseek-ai/DeepSeek-R1';
+//const chatModel ='Pro/deepseek-ai/DeepSeek-R1';
+const chatModel ='openai/o4-mini';
+const openrouterKey = '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';
+const openrouterHost = 'https://openrouter.ai/api/v1/chat/completions'; 
+const siliconflowKey = 'sk-ldrpfdlimnrwcrgmkdemwqkphisowucfzpvqbmakltjmgnsb';
+const siliconflowHost = 'https://api.siliconflow.cn/v1/chat/completions';
+
 function getNearestStop(location: string, cities: City[]): Station | undefined {
   for (const city of cities) {
     const stops: DistrictArea | undefined = ServiceStops[city.city];
@@ -474,82 +480,149 @@ ${JSON.stringify(stops)}
 - 基于上面前提和需求生成补能线路,格式为:[{start: <旅程起始点或者上一个补能点名称>; end: <补能点名称>; distance: <行驶距离单位为KM>; consumedTime: <行驶时长单位为分钟>; consumedBattery: <预计消耗电量单位为度>, chargeDetail: <预计充电时长和充电度数>, tags:[<与该补能点匹配的所有标签>]}]
 - 严格按照格式返回JSON格式的补能线路不返回任何其他东西
   `;
-  const answer: string = await askLlm(
-    chatModel,
-    [{
-      content: prompt,
-      role: 'user'
-      }]);
-
-  return JSON.parse(answer);
-}
 */
 
 
 enum Preset {
   conservative = '**conservative**:make sure there is always a backup service stop to recharge when currently planned service stop is out of service, make sure soc is above the minimal allowed soc when car arrives the backup service stop.**tag**:<backup service stop name, remaining soc when arrival at backup service stop>',
-  aggressive = '**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:No',
-  breakfastCharge = '**recharging at breakfast time**:prioritize recharging during breakfast time.**tag**:breakfast charge',
-  lunchCharge = '**recharging at lunch time**:prioritize recharging during lunch time.**tag**:lunch charge',
-  dinnerCharge = '**recharging at dinner time**:prioritize recharging during dinner time.**tag**:dinner charge',
-  avoidExpensiveWindow = '**avoid expensive charging window**:try to avoid recharging at 11:00 - 13:00, 17:00 - 23:00. **tag**:expensive charging,cheap charging',
+  aggressive = '**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:无',
+  breakfastCharge = '**recharging at breakfast time**:prioritize recharging during breakfast time.**tag**:用早餐充电',
+  lunchCharge = '**recharging at lunch time**:prioritize recharging during lunch time.**tag**:用午餐充电',
+  dinnerCharge = '**recharging at dinner time**:prioritize recharging during dinner time.**tag**:用晚餐充电',
+  avoidExpensiveWindow = '**avoid expensive charging window**:try to avoid recharging at 11:00 - 13:00, 17:00 - 23:00. **tag**:峰时电价,谷时电价',
 }
 
 async function plan(stops: Stop[], startTime: string, maxSoc: string, minSoc: string, maxBattery: string, presets: Preset[], otherRequirement: string): Promise<any> {
   const prompt = `
 please assist the EV driver to make a recharging plan based on below info:
 **basic info**:
-- departure time: ${startTime}
+- Journey start time: ${startTime}
 - EV full battery: ${maxBattery}
 - Max recharge to : ${maxSoc}
 - Minimal allowed Soc: ${minSoc}
 - Charging rate: ${chargeSpeed}Kwh per hour
-- Charging overhead: ${chargeEffe}, meaning per 1kwh from the charger only ${chargeEffe}kwh can be converted to car
+- Charging overhead: ${chargeEffe}, meaning per 1kwh from the charger only ${chargeEffe}kwh can be converted into car's battery
 
 **route data structure info**:
-- the route consists of a list of steps, each step following below JSON structure:{start: <name of the start service stop>, end: <name of the end service stop>, consumedTime: <driving time from start to end in mins>, consumedBattery: <consumed battery from start to end in Kwh>}
+- the route provided to you consists of a list of steps, each step follows below JSON structure: {start: <name of the start service stop>, end: <name of the end service stop>, consumedTime: <driving time from start to end in mins>, consumedBattery: <consumed battery from start to end in Kwh>}
 - car can be recharged at any of these service stops
 **route data**:
 ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) => {return {start, end, consumedTime, consumedBattery}}))}
 
-**driver's selected requirements(selected requirement includes both requirement and related tags, tags can be put on the matching service stops)**:
+**driver's selected requirements(the options provided by App, selected requirement includes both requirement and related tags, tags can be put on the matching service stops)**:
 - ${presets.join('\n- ')}
 **driver's freely input requirements**:
 - freely input requirement takes prioritiy over the selected requirements
-- understand and try best to fulfill the input requirement, and create tag for them if applicable, each tag should not exceed 5 words 
+- understand and try best to fulfill the input requirement, and create tags for them if applicable, each tag should be in Chinese and shoud not exceed 10 words 
 - freely input requirements are following: ${otherRequirement}
-
-**output requirement**:
-- generate the recharging plan by strictly follow below format:
-[{fromStop: <journey start point or previous recharging service stop>, arrivalStop: <current recharging service stop>, arrivalTime: <arrival time>, departureTime: <departure time>, chargeDetail: <planned recharging details>, tags:[<tags matching current service stop>]}]
   `;
+//- generate the recharging plan by strictly follow below format:
+//[{fromStop: <>, arrivalStop: <current recharging service stop>, arrivalTime: <arrival time>, departureTime: <departure time>, chargeDetail: <planned recharging details>, tags:[<tags matching current service stop>]}]
+  const response_format: any =
+  {
+    type: 'json_schema',
+    json_schema: {
+      name: "rechargePlan",
+      strict: true,
+      schema: {
+      type: 'object',
+      required: ['rechargingPlan'],
+      properties: {
+        rechargingPlan: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              fromStop: {
+                type: 'string',
+                description: 'Journey start point or previous recharging service stop name'
+              },
+              arrivalStop: {
+                type: 'string',
+                description: 'Current planned recharging service stop name'
+              },
+              arrivalTime: {
+                type: 'string',
+                description: 'The estimated time of arriving arrivalStop, format as: HH:MM, HH is from 00 to 23'
+              },
+              departureTime: {
+                type: 'string',
+                description: 'The estimated time of departing arrivalStop, format as: HH:MM, HH is from 00 to 23'
+              },
+              socBeforeRecharge: {
+                type: 'integer',
+                description: 'The percentage of soc before recharging,  from 1 to 99, means 1% - 99%',
+                minimum: 1,
+                maximum: 99
+              },
+              socAfterRecharge: {
+                type: 'integer',
+                description: 'The percentage of soc after recharging,  from 2 to 100, means 2% - 100%',
+                minimum: 2,
+                maximum: 100
+              },
+              rechargeTime: {
+                type: 'integer',
+                description: 'Estimated time to complete recharging in minutes',
+                minimum: 1
+              },
+              tags: {
+                type: 'array',
+                description: 'The tags that matching current service stop',
+                items: {
+                  type: 'string',
+                  description: 'The tag name'
+                }
+              }
+            },
+            required: ['fromStop', 'arrivalStop', 'arrivalTime', 'departureTime', 'socBeforeRecharge', 'socAfterRecharge', 'rechargeTime', 'tags'],
+            additionalProperties: false
+          }
+        }
+      }}
+    }
+  }
+
   const answer: string = await askLlm(
     chatModel,
-    [{
-      content: prompt,
-      role: 'user'
-      }]);
+    [
+      {
+        role: 'system',
+        content: [
+          {
+            type: "text",
+            text: 'You are a helpful assistant for to help user make all kinds of accurate and efficient plans.'
+          }]
+      },
+      {
+        content: [{type: 'text', text: prompt}],
+        role: 'user'
+      }],
+    response_format);
 
   return JSON.parse(answer);
 }
 
-async function askLlm(model: string, messages: any[]): Promise<string> {
+async function askLlm(model: string, messages: any[], response_format?: any): Promise<string> {
   console.log('LLM call', messages);
+  const body: any = {
+    model,
+    messages,
+    stream: false
+  }
+  if (response_format !== undefined) {
+    body.response_format = response_format;
+  }
+
   let response: any = await fetch(
-    'https://api.siliconflow.cn/v1/chat/completions',
+    openrouterHost,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer sk-ldrpfdlimnrwcrgmkdemwqkphisowucfzpvqbmakltjmgnsb'
+        'Authorization': `Bearer ${openrouterKey}`
       },
-      body: JSON.stringify(
-        {
-          model,
-          messages,
-          stream: false,
-        }
-      )
+      body: JSON.stringify(body)
     }
   );
   response = await response.json();
@@ -560,9 +633,9 @@ async function askLlm(model: string, messages: any[]): Promise<string> {
 generateRoute(
   '广州市黄埔区中新知识城招商雍景湾',
   '桂林西站',
-  '6:30AM', '85%', '8%', '61Kwh',
-  [Preset.aggressive, Preset.lunchCharge],
-  'recharge the car till 100% if lunch time and make sure at least 15% when arrival at destination').then(ret => console.log(ret));
+  '6:30', '85%', '8%', '61Kwh',
+  [Preset.conservative, Preset.lunchCharge],
+  '午餐时段可以充满至100%, 确保抵达终点时有至少15%的电').then(ret => console.log(ret));
 
 async function r(city: string, pageNum: number): Promise<any> {
   const reqUrl = `https://restapi.amap.com/v5/place/text?types=180300&key=d0e0aab6356af92b0cd0763cae27ba35&output=json&region=${city}&page_size=25&page_num=${pageNum}`;
