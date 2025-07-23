@@ -3,6 +3,8 @@ const Weight = 2.1;
 const chargeEffe = 0.92;
 const chargeSpeed = 70;
 const J2KwhFactor = 3.6e6;
+const maxBattery = 61;
+const hardMinSoc = 5;
 
 interface Step {
   step_distance: string;
@@ -61,12 +63,14 @@ function getGravityEnergyKwh(distance: number, weight: number, altitudeDiff: num
   return altitudeDiff >=0 ? slopeEnergy : slopeEnergy * eta;
 }
 
-async function generateRoute(startAddress: string, destAddres: string, startTime: string, maxSoc: string, minSoc: string, maxBattery: string, presets: Preset[], otherRequirement: string): Promise<Stop[]> {
+async function generateRoute(startAddress: string, destAddres: string, startTime: string, maxSoc: string, minSoc: string, presets: Preset[], otherRequirement: string): Promise<AiPlanStep[]> {
   const stops = await collectStops(
   {location: await convLocation(startAddress), name: startAddress},
   {location: await convLocation(destAddres), name: destAddres});
   console.log(stops);
-  return await plan(stops, startTime, maxSoc, minSoc, maxBattery, presets, otherRequirement);
+  const aiPlan: AiPlanStep[] = await plan(stops, startTime, maxSoc, minSoc, presets, otherRequirement);
+  verifyPlan(aiPlan, stops, startTime);
+  return aiPlan;
 }
 
 async function collectStops(startStation: Station, endStation: Station): Promise<Stop[]> {
@@ -79,7 +83,7 @@ async function collectStops(startStation: Station, endStation: Station): Promise
     if (!step.cost.toll_road || distance < 500) continue;
 
     const polylines: string[] = step.polyline.split(';').splice(1);
-    const incre = Math.floor(polylines.length / Math.floor(distance / 5000)); // scan at every 5KM
+    const incre = Math.floor(polylines.length / Math.floor(distance / 2000)); // scan at every 2KM
     for (let index=0; index < polylines.length; index += incre) {
       const ret: Station|undefined = getNearestStop(polylines[index], step.cities);
       if (ret !== undefined && ret.name !== prevStation.name) {
@@ -113,7 +117,7 @@ async function getStopRecord(fromStop: Station, targetStop: Station): Promise<St
     }
   }
 
-  consumedBattery = parseFloat(consumedBattery.toFixed(1));
+  consumedBattery = parseFloat(consumedBattery.toFixed(2));
   return {
     start: fromStop.name,
     end: targetStop.name,
@@ -140,8 +144,10 @@ async function convLocation(address: string): Promise<string> {
   return response.geocodes[0].location;
 }
 
-//const chatModel ='Pro/deepseek-ai/DeepSeek-R1';
-const chatModel ='openai/o4-mini';
+const chatModelDsR1 ='Pro/deepseek-ai/DeepSeek-R1';
+const chatModelO4Mini ='openai/o4-mini';
+const chatModelO4MiniHigh ='openai/o4-mini-high';
+const chatModelGrok4 ='x-ai/grok-4';
 const openrouterKey = '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';
 const openrouterHost = 'https://openrouter.ai/api/v1/chat/completions'; 
 const siliconflowKey = 'sk-ldrpfdlimnrwcrgmkdemwqkphisowucfzpvqbmakltjmgnsb';
@@ -443,48 +449,8 @@ async function sleep(sec: number): Promise<void> {
   });
 }
 
-/*
 enum Preset {
-  conservative = '**保守策略**:保证即使在当前规划的补能点服务不可用时,仍能保证设定的最低电量到达备用补能点.**标签**:<备用补能点名称和距离,以及到达备用补能点的预计剩余soc>',
-  aggressive = '**激进策略**:仅保证按照设定最低电量能到达规划补能点以达到效率最大化.**标签**:无',
-  dinnerTimeCharge = '**优先用餐时充电**:优先规划在用餐时间(早餐,午餐,晚餐)进行充电.**标签**:早餐,午餐,晚餐',
-  avoidExpensiveWindow = '**避开尖峰电价充电**:优先避免在尖峰时段11:00 - 13:00, 17:00 - 23:00安排充电. **标签**:电价峰时,电价谷时',
-}
-
-async function plan(stops: Stop[], startTime: string, maxSoc: string, minSoc: string, maxBattery: string, presets: Preset[], otherRequirement: string): Promise<any> {
-  const prompt = `
-你是路径规划专家,基于下面数据帮助电车车主规划长途旅行的沿途充电路线:
-**基础信息**:
-- 出发时间: ${startTime}
-- 电池最大电量: ${maxBattery}
-- 最大充满电量: ${maxSoc}, 车辆最多充满至此soc
-- 最小允许电量: ${minSoc}, 车辆在到达下一补能点前需保证剩余soc大于此最小允许电量
-- 充电功率: ${chargeSpeed}度/小时
-- 充电效率: ${chargeEffe}, 意味着每充1度电只有${chargeEffe}度能充进车里
-
-**沿途区间数据说明**:
-- 行车路线的沿途区间数据会以JSON数组格式提供给你
-- 每个区间信息数据格式为{start: <区间起点补能点名称>; end: <区间终点补能点名称>; distance: <区间距离单位为KM>; consumedTime: <区间行驶时长单位为分钟>; consumedBattery: <区间预计消耗电量单位为度>;}
-- 每个补能点都能充电
-**沿途区间数据**:
-${JSON.stringify(stops)}
-
-**用户预选需求(预选需求包含需求本身以及与该需求相关的标签,标签可以打在与之匹配的补能点上)**:
-- ${presets.join('\n- ')}
-**用户自由需求**:
-- 用户自由输入的需求,该需求优先级应大于预选需求
-- 请分析拆解用户自由需求为子需求,保证子需求能得到满足,并且给每个子需求总结对应的标签,每个标签字数控制在10个汉字以内
-- 用户自由需求如下: ${otherRequirement}
-
-**输出结果要求**:
-- 基于上面前提和需求生成补能线路,格式为:[{start: <旅程起始点或者上一个补能点名称>; end: <补能点名称>; distance: <行驶距离单位为KM>; consumedTime: <行驶时长单位为分钟>; consumedBattery: <预计消耗电量单位为度>, chargeDetail: <预计充电时长和充电度数>, tags:[<与该补能点匹配的所有标签>]}]
-- 严格按照格式返回JSON格式的补能线路不返回任何其他东西
-  `;
-*/
-
-
-enum Preset {
-  conservative = '**conservative**:make sure there is always a backup service stop to recharge when currently planned service stop is out of service, make sure soc is above the minimal allowed soc when car arrives the backup service stop.**tag**:<backup service stop name, remaining soc when arrival at backup service stop>',
+  conservative = '**conservative**:make sure there is always a backup service stop to recharge in case driver arrives at the planned service stop and finds out it is out of service, make sure soc is above the minimal allowed soc when car arrives the backup service stop.**tag**:<backup service stop name, remaining soc when arrival at backup service stop>',
   aggressive = '**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:无',
   breakfastCharge = '**recharging at breakfast time**:prioritize recharging during breakfast time.**tag**:用早餐充电',
   lunchCharge = '**recharging at lunch time**:prioritize recharging during lunch time.**tag**:用午餐充电',
@@ -492,14 +458,116 @@ enum Preset {
   avoidExpensiveWindow = '**avoid expensive charging window**:try to avoid recharging at 11:00 - 13:00, 17:00 - 23:00. **tag**:峰时电价,谷时电价',
 }
 
-async function plan(stops: Stop[], startTime: string, maxSoc: string, minSoc: string, maxBattery: string, presets: Preset[], otherRequirement: string): Promise<any> {
+interface AiPlanStep {
+  fromStop: string;
+  arrivalStop: string;
+  arrivalTime: string;
+  departureTime: string;
+  socBeforeRecharge: number;
+  socAfterRecharge: number;
+  rechargeTime: number;
+  tags: string[];
+}
+
+function toMinutes(time: string): number {
+  let [hour, min] = time.split(':');
+  return parseInt(hour) * 60 + parseInt(min);
+}
+
+function calculateConsumptionAndTime(from: string, to: string, stops: Stop[]): number[] {
+  let time = 0;
+  let kwh = 0;
+  let found = false;
+  for (const stop of stops) {
+    if (stop.start === from) {
+      found = true;
+    }
+
+    if (found) {
+      time += stop.consumedTime;
+      kwh += stop.consumedBattery;
+    }
+
+    if (stop.end === to) {
+      if (!found) break;
+      else return [kwh, time];
+    }
+  }
+
+  const err = `从${from}到${to}的旅程没找到`;
+  alert(err);
+  throw new Error(err);
+}
+
+function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): void {
+  let totalTime = toMinutes(startTime);
+  let leftKwh = maxBattery;
+  const minKwh = Math.floor(hardMinSoc * 0.01 * maxBattery);
+
+  for (const step of plan) {
+    const [kwh, time] = calculateConsumptionAndTime(step.fromStop, step.arrivalStop, stops);
+    totalTime += time;
+    leftKwh -= kwh;
+
+    if (leftKwh < minKwh) {
+      const err = `${step.fromStop} to ${step.arrivalStop}: 最低soc ${hardMinSoc}%偏差, 实际剩余${leftKwh}度, 需要剩余${minKwh}度`;
+      alert(err);
+      throw new Error(err);
+    }
+
+    let aiGuessArrival = toMinutes(step.arrivalTime);
+    if (Math.abs(aiGuessArrival - totalTime) > 2) {
+      const err = `${step.fromStop} to ${step.arrivalStop}: 预估到达时间偏差, 实际${totalTime}分钟, ai预估${aiGuessArrival}分钟`;
+      alert(err);
+      throw new Error(err);
+    }
+
+    let aiGuessKwh: number = Math.floor(step.socBeforeRecharge * 0.01 * maxBattery);
+    if (Math.abs(aiGuessKwh - Math.floor(leftKwh)) > 1) {
+      const err = `${step.fromStop} to ${step.arrivalStop}: 预估电量偏差, 实际${Math.floor(leftKwh)}kwh, ai预估${Math.floor(aiGuessKwh)}kwh`;
+      alert(err);
+      throw new Error(err);
+    }
+
+    let chargeKwh = (step.socAfterRecharge - step.socBeforeRecharge) * 0.01 * maxBattery / chargeEffe;
+    let chargeTime = Math.ceil(chargeKwh / chargeSpeed * 60);
+    if (Math.abs(step.rechargeTime - chargeTime) > 2) {
+      const err = `${step.fromStop} to ${step.arrivalStop}: 预估充电时间偏差, 实际${chargeTime}分钟, ai预估${step.rechargeTime}分钟`;
+      alert(err);
+      throw new Error(err);
+    }
+    totalTime += step.rechargeTime;
+    let aiGuessTime = toMinutes(step.departureTime);
+    if (Math.abs(aiGuessTime - totalTime) > 2) {
+      const err = `${step.fromStop} to ${step.arrivalStop}: 预估离去时间偏差, 实际${totalTime}分钟, ai预估${aiGuessTime}分钟`;
+      alert(err);
+      throw new Error(err);
+    }
+    totalTime = aiGuessTime;
+    leftKwh = parseFloat((step.socAfterRecharge * 0.01 * maxBattery).toFixed(2));
+  }
+
+  const lastPlannedStop = plan[plan.length -1].arrivalStop;
+  const lastStop = stops[stops.length -1].end;
+  if (lastStop !== lastPlannedStop) {
+    const [kwh, _time] = calculateConsumptionAndTime(lastPlannedStop, lastStop, stops);
+    leftKwh -= kwh;
+    if (leftKwh < minKwh) {
+      const err = `${lastPlannedStop} to ${lastStop}: 最低soc ${hardMinSoc}%偏差, 实际剩余${leftKwh}度,小于${minKwh}度`;
+      alert(err);
+      throw new Error(err);
+    }
+  }
+}
+
+async function plan(stops: Stop[], startTime: string, maxSoc: string, minSoc: string, presets: Preset[], otherRequirement: string): Promise<AiPlanStep[]> {
   const prompt = `
 please assist the EV driver to make a recharging plan based on below info:
 **basic info**:
 - Journey start time: ${startTime}
-- EV full battery: ${maxBattery}
+- EV full battery: ${maxBattery}Kwh
 - Max recharge to : ${maxSoc}
-- Minimal allowed Soc: ${minSoc}
+- Minimal allowed Soc: ${minSoc}, minimal allowed soc before arriving at a recharging stop, set by user, should never be under ${hardMinSoc}%, if asked minimal allowed soc is under ${hardMinSoc}%, use hard setting: ${hardMinSoc}%
 - Charging rate: ${chargeSpeed}Kwh per hour
 - Charging overhead: ${chargeEffe}, meaning per 1kwh from the charger only ${chargeEffe}kwh can be converted into car's battery
 
@@ -526,10 +594,15 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
       strict: true,
       schema: {
       type: 'object',
-      required: ['rechargingPlan'],
+      required: ['reason', 'rechargingPlan'],
       properties: {
+        reason: {
+          type: 'string',
+          description: 'When it is not possible to make a plan, this field explains why, when a plan can be made return "" for this field.'
+        },
         rechargingPlan: {
           type: 'array',
+          description: 'When a plan can not be made, return empty array for this field. The "fromStop" field of the first item must be the start service stop of the journey',
           items: {
             type: 'object',
             properties: {
@@ -583,8 +656,14 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
     }
   }
 
+  const promptForDsR1 = prompt + `\n**output requirement**:
+  generate output which strictly follows below JSON schema:
+  ${JSON.stringify(response_format)}`;
+
   const answer: string = await askLlm(
-    chatModel,
+    siliconflowHost,
+    siliconflowKey,
+    chatModelDsR1,
     [
       {
         role: 'system',
@@ -595,15 +674,21 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
           }]
       },
       {
-        content: [{type: 'text', text: prompt}],
+        content: [{type: 'text', text: promptForDsR1}],
         role: 'user'
       }],
-    response_format);
+    //response_format);
+    );
 
-  return JSON.parse(answer);
+  const ret: any = JSON.parse(answer);
+  if (ret.reason) {
+    alert(ret.reason);
+    throw new Error(ret.reason);
+  }
+  return ret.rechargingPlan as AiPlanStep[];
 }
 
-async function askLlm(model: string, messages: any[], response_format?: any): Promise<string> {
+async function askLlm(host: string, key: string, model: string, messages: any[], response_format?: any): Promise<string> {
   console.log('LLM call', messages);
   const body: any = {
     model,
@@ -615,12 +700,12 @@ async function askLlm(model: string, messages: any[], response_format?: any): Pr
   }
 
   let response: any = await fetch(
-    openrouterHost,
+    host,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openrouterKey}`
+        'Authorization': `Bearer ${key}`
       },
       body: JSON.stringify(body)
     }
@@ -633,7 +718,7 @@ async function askLlm(model: string, messages: any[], response_format?: any): Pr
 generateRoute(
   '广州市黄埔区中新知识城招商雍景湾',
   '桂林西站',
-  '6:30', '85%', '8%', '61Kwh',
+  '6:30', '85%', '8%',
   [Preset.conservative, Preset.lunchCharge],
   '午餐时段可以充满至100%, 确保抵达终点时有至少15%的电').then(ret => console.log(ret));
 
