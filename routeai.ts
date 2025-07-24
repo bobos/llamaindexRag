@@ -63,12 +63,12 @@ function getGravityEnergyKwh(distance: number, weight: number, altitudeDiff: num
   return altitudeDiff >=0 ? slopeEnergy : slopeEnergy * eta;
 }
 
-async function generateRoute(startAddress: string, destAddres: string, startTime: string, maxSoc: string, minSoc: string, presets: Preset[], otherRequirement: string): Promise<AiPlanStep[]> {
+async function generateRoute(startAddress: string, destAddres: string, startTime: string, startSoc: number, maxSoc: number, minSoc: number, presets: Preset[], otherRequirement: string): Promise<AiPlanStep[]> {
   const stops = await collectStops(
   {location: await convLocation(startAddress), name: startAddress},
   {location: await convLocation(destAddres), name: destAddres});
   console.log(stops);
-  const aiPlan: AiPlanStep[] = await plan(stops, startTime, maxSoc, minSoc, presets, otherRequirement);
+  const aiPlan: AiPlanStep[] = await plan(stops, startTime, startSoc, maxSoc, minSoc, presets, otherRequirement);
   verifyPlan(aiPlan, stops, startTime);
   return aiPlan;
 }
@@ -144,7 +144,9 @@ async function convLocation(address: string): Promise<string> {
   return response.geocodes[0].location;
 }
 
-const chatModelDsR1 ='Pro/deepseek-ai/DeepSeek-R1';
+//const chatModelDsR1 ='Pro/deepseek-ai/DeepSeek-R1';
+const chatModelDsR1 ='deepseek/deepseek-r1-0528';
+const chatModelDsV3 = 'deepseek-ai/DeepSeek-V3';
 const chatModelO4Mini ='openai/o4-mini';
 const chatModelO4MiniHigh ='openai/o4-mini-high';
 const chatModelGrok4 ='x-ai/grok-4';
@@ -152,6 +154,32 @@ const openrouterKey = 'sk-or-v1-49651ec20b53271feacb5bccb6d2e93e68dc052d78db1bff
 const openrouterHost = 'https://openrouter.ai/api/v1/chat/completions'; 
 const siliconflowKey = 'sk-ldrpfdlimnrwcrgmkdemwqkphisowucfzpvqbmakltjmgnsb';
 const siliconflowHost = 'https://api.siliconflow.cn/v1/chat/completions';
+
+const tools = [{
+  type: 'function',
+  function: {
+    name: 'simpleCalculator',
+    description: 'Use this tool to perform simple calculation, it only supports add(+), substract(-), multiply(*), divide(/) and reminder(%) operators',
+    parameters: {
+      type: 'object',
+      properties: {
+        arithmeticExpression: {
+          type: 'string',
+          description: 'The arithmeticExpression to be performed, for example: 0.9 / (8 + 3) * 6'
+        }
+      },
+      required: ['arithmeticExpression']
+    }
+  }
+}]
+
+function simpleCalculator(arithmeticExpression: string): string {
+  const regex = /^[\d+\-*/%. ]+$/;
+  if (!regex.test(arithmeticExpression)) {
+    return 'Input arithmeticExpression is invalid.';
+  }
+  return eval(arithmeticExpression).toFixed(2);
+}
 
 function getNearestStop(location: string, cities: City[]): Station | undefined {
   for (const city of cities) {
@@ -560,14 +588,15 @@ function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): void 
   }
 }
 
-async function plan(stops: Stop[], startTime: string, maxSoc: string, minSoc: string, presets: Preset[], otherRequirement: string): Promise<AiPlanStep[]> {
+async function plan(stops: Stop[], startTime: string, startSoc: number, maxSoc: number, minSoc: number, presets: Preset[], otherRequirement: string): Promise<AiPlanStep[]> {
   const prompt = `
 please assist the EV driver to make a recharging plan based on below info:
 **basic info**:
 - Journey start time: ${startTime}
 - EV full battery: ${maxBattery}Kwh
-- Max recharge to : ${maxSoc}
-- Minimal allowed Soc: ${minSoc}, minimal allowed soc before arriving at a recharging stop, set by user, should never be under ${hardMinSoc}%, if asked minimal allowed soc is under ${hardMinSoc}%, use hard setting: ${hardMinSoc}%
+- Start Soc: ${startSoc}%
+- Max recharge to Soc: ${maxSoc}%
+- Minimal allowed Soc: ${minSoc}%, minimal allowed soc before arriving at a recharging stop, set by user, should never be under ${hardMinSoc}%, if asked minimal allowed soc is under ${hardMinSoc}%, use hard setting: ${hardMinSoc}%
 - Charging rate: ${chargeSpeed}Kwh per hour
 - Charging overhead: ${chargeEffe}, meaning per 1kwh from the charger only ${chargeEffe}kwh can be converted into car's battery
 
@@ -595,6 +624,7 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
       schema: {
       type: 'object',
       required: ['reason', 'rechargingPlan'],
+      additionalProperties: false,
       properties: {
         reason: {
           type: 'string',
@@ -661,38 +691,41 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
   ${JSON.stringify(response_format)}`;
 
   const answer: string = await askLlm(
-    siliconflowHost,
-    siliconflowKey,
-    chatModelDsR1,
+    openrouterHost,
+    openrouterKey,
+    chatModelO4Mini,
     [
       {
         role: 'system',
         content: [
           {
             type: "text",
-            text: 'You are a helpful assistant for to help user make all kinds of accurate and efficient plans.'
+            text: 'You are a helpful assistant for to help user make all kinds of accurate and efficient plans, and always use a tool to perform calculations.'
           }]
       },
       {
-        content: [{type: 'text', text: promptForDsR1}],
+        content: [{type: 'text', text: prompt}],
         role: 'user'
       }],
-    //response_format);
-    );
+    response_format);
 
   const ret: any = JSON.parse(answer);
   if (ret.reason) {
     alert(ret.reason);
-    throw new Error(ret.reason);
+  }
+  if (!ret.rechargingPlan || ret.rechargingPlan.length === 0) {
+    throw new Error('no plan provided');
   }
   return ret.rechargingPlan as AiPlanStep[];
 }
 
+let callCnt = 0;
 async function askLlm(host: string, key: string, model: string, messages: any[], response_format?: any): Promise<string> {
   console.log('LLM call', messages);
   const body: any = {
     model,
     messages,
+    //tools,
     stream: false
   }
   if (response_format !== undefined) {
@@ -710,15 +743,36 @@ async function askLlm(host: string, key: string, model: string, messages: any[],
       body: JSON.stringify(body)
     }
   );
-  response = await response.json();
-  console.log('LLM answer', response.choices[0].message.content);
-  return response.choices[0].message.content.trim();
+  response = (await response.json()).choices[0].message;
+  if (response.tool_calls) {
+    if (callCnt > 20) {
+      throw new Error('too many function calls');
+    }
+    console.log('perform function calls');
+    callCnt++;
+    return await askLlm(host, key, model, messages.concat(functionCalls(response.tool_calls)), response_format);
+  }
+  console.log('LLM answer', response.content);
+  return response.content.trim();
+}
+
+function functionCalls(tool_calls: {function: {arguments: string, name: string}, id: string, type: string}[]): any[] {
+  let messages: any[] = [{role: 'assistant', tool_calls}];
+  for (const toolCall of tool_calls) {
+    if (toolCall.function.name !== 'simpleCalculator') {
+      throw new Error(`no such function: ${toolCall.function.name}`);
+    }
+
+    const val: string = simpleCalculator(JSON.parse(toolCall.function.arguments).arithmeticExpression);
+    messages.push({role: 'tool', tool_call_id: toolCall.id, content: val});
+  }
+  return messages;
 }
 
 generateRoute(
   '广州市黄埔区中新知识城招商雍景湾',
   '桂林西站',
-  '6:30', '85%', '8%',
+  '6:30', 100, 85, 8,
   [Preset.conservative, Preset.lunchCharge],
   '午餐时段可以充满至100%, 确保抵达终点时有至少15%的电').then(ret => console.log(ret));
 
