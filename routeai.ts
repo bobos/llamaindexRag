@@ -69,7 +69,6 @@ async function generateRoute(startAddress: string, destAddres: string, startTime
   {location: await convLocation(destAddres), name: destAddres});
   console.log(stops);
   const aiPlan: AiPlanStep[] = await plan(stops, startTime, startSoc, maxSoc, minSoc, presets, otherRequirement);
-  verifyPlan(aiPlan, stops, startTime);
   return aiPlan;
 }
 
@@ -478,8 +477,8 @@ async function sleep(sec: number): Promise<void> {
 }
 
 enum Preset {
-  conservative = '**conservative**:make sure there is always a backup service stop to recharge in case driver arrives at the planned service stop and finds out it is out of service, make sure soc is above the minimal allowed soc when car arrives the backup service stop.**tag**:<backup service stop name, remaining soc when arrival at backup service stop>',
-  aggressive = '**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:无',
+  conservative = `**conservative**:make sure there is always a backup service stop to recharge in case driver arrives at the planned service stop and finds out it is out of service, make sure soc is above ${hardMinSoc}% when car arrives the backup service stop.**tag**:None`,
+  aggressive = '**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:None',
   breakfastCharge = '**recharging at breakfast time**:prioritize recharging during breakfast time.**tag**:用早餐充电',
   lunchCharge = '**recharging at lunch time**:prioritize recharging during lunch time.**tag**:用午餐充电',
   dinnerCharge = '**recharging at dinner time**:prioritize recharging during dinner time.**tag**:用晚餐充电',
@@ -489,6 +488,7 @@ enum Preset {
 interface AiPlanStep {
   fromStop: string;
   arrivalStop: string;
+  backupStop: string;
   arrivalTime: string;
   departureTime: string;
   socBeforeRecharge: number;
@@ -527,49 +527,82 @@ function calculateConsumptionAndTime(from: string, to: string, stops: Stop[]): n
   throw new Error(err);
 }
 
-function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): void {
+function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): string {
   let totalTime = toMinutes(startTime);
   let leftKwh = maxBattery;
   const minKwh = Math.floor(hardMinSoc * 0.01 * maxBattery);
+  let deviation = 0;
 
   for (const step of plan) {
     const [kwh, time] = calculateConsumptionAndTime(step.fromStop, step.arrivalStop, stops);
     totalTime += time;
+    let tempLeftKwh = leftKwh;
     leftKwh -= kwh;
 
     if (leftKwh < minKwh) {
-      const err = `${step.fromStop} to ${step.arrivalStop}: 最低soc ${hardMinSoc}%偏差, 实际剩余${leftKwh}度, 需要剩余${minKwh}度`;
-      alert(err);
-      throw new Error(err);
+      const err = `The hard minimal allowed Soc is ${hardMinSoc}%, but according to your plan, the remaining Soc from ${step.fromStop} to ${step.arrivalStop} will be under ${hardMinSoc}%`;
+      console.log(err);
+      return err;
+    }
+
+    if (step.backupStop) {
+      let arrivalFound = false;
+      for (const stop of stops) {
+        if (stop.start === step.arrivalStop) {
+          arrivalFound = true;
+        }
+
+        if (step.backupStop === stop.start) {
+          if (arrivalFound) break;
+          const err = `The backup service stop should be after the arrival stop, but according to your plan, backup stop ${step.backupStop} is before arrival stop ${step.arrivalStop}`;
+          console.log(err);
+          return err;
+        }
+      }
+
+      const [kwh, _time] = calculateConsumptionAndTime(step.fromStop, step.backupStop, stops);
+      tempLeftKwh -= kwh;
+
+      if (tempLeftKwh < minKwh) {
+        const err = `The hard minimal allowed Soc is ${hardMinSoc}%, but according to your plan, the remaining Soc from ${step.fromStop} to backup stop ${step.backupStop} will be under ${hardMinSoc}%`;
+        console.log(err);
+        return err;
+      }
     }
 
     let aiGuessArrival = toMinutes(step.arrivalTime);
-    if (Math.abs(aiGuessArrival - totalTime) > 2) {
-      const err = `${step.fromStop} to ${step.arrivalStop}: 预估到达时间偏差, 实际${totalTime}分钟, ai预估${aiGuessArrival}分钟`;
-      alert(err);
-      throw new Error(err);
+    deviation = Math.abs(aiGuessArrival - totalTime); 
+    if (deviation > 2) {
+      const err = `Comparing to the actually calculated result, there is ${deviation} minutes deviation on arrival time from ${step.fromStop} to ${step.arrivalStop} according to your plan`;
+      console.log(err);
+      return err;
     }
 
     let aiGuessKwh: number = Math.floor(step.socBeforeRecharge * 0.01 * maxBattery);
-    if (Math.abs(aiGuessKwh - Math.floor(leftKwh)) > 1) {
-      const err = `${step.fromStop} to ${step.arrivalStop}: 预估电量偏差, 实际${Math.floor(leftKwh)}kwh, ai预估${Math.floor(aiGuessKwh)}kwh`;
-      alert(err);
-      throw new Error(err);
+    deviation = Math.abs(aiGuessKwh - Math.floor(leftKwh));
+    if (deviation > 1) {
+      const err = `Comparing to the actually calculated result, there is ${deviation} Kwh deviation on left battery when arrival at ${step.arrivalStop} according to your plan`;
+      console.log(err);
+      return err;
     }
 
     let chargeKwh = (step.socAfterRecharge - step.socBeforeRecharge) * 0.01 * maxBattery / chargeEffe;
     let chargeTime = Math.ceil(chargeKwh / chargeSpeed * 60);
-    if (Math.abs(step.rechargeTime - chargeTime) > 2) {
-      const err = `${step.fromStop} to ${step.arrivalStop}: 预估充电时间偏差, 实际${chargeTime}分钟, ai预估${step.rechargeTime}分钟`;
-      alert(err);
-      throw new Error(err);
+    
+    deviation = Math.abs(step.rechargeTime - chargeTime);
+    if (deviation > 2) {
+      const err = `Comparing to the actually calculated result, there is ${deviation} minutes deviation on recharging time when recharging at ${step.arrivalStop} according to your plan`;
+      console.log(err);
+      return err;
     }
+
     totalTime += step.rechargeTime;
     let aiGuessTime = toMinutes(step.departureTime);
-    if (Math.abs(aiGuessTime - totalTime) > 2) {
-      const err = `${step.fromStop} to ${step.arrivalStop}: 预估离去时间偏差, 实际${totalTime}分钟, ai预估${aiGuessTime}分钟`;
-      alert(err);
-      throw new Error(err);
+    deviation = Math.abs(aiGuessTime - totalTime);
+    if (deviation > 2) {
+      const err = `Comparing to the actually calculated result, there is ${deviation} minutes deviation on departure time when departing ${step.arrivalStop} according to your plan`;
+      console.log(err);
+      return err;
     }
     totalTime = aiGuessTime;
     leftKwh = parseFloat((step.socAfterRecharge * 0.01 * maxBattery).toFixed(2));
@@ -581,14 +614,16 @@ function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): void 
     const [kwh, _time] = calculateConsumptionAndTime(lastPlannedStop, lastStop, stops);
     leftKwh -= kwh;
     if (leftKwh < minKwh) {
-      const err = `${lastPlannedStop} to ${lastStop}: 最低soc ${hardMinSoc}%偏差, 实际剩余${leftKwh}度,小于${minKwh}度`;
-      alert(err);
-      throw new Error(err);
+      const err = `The hard minimal allowed Soc is ${hardMinSoc}%, but according to your plan, the remaining Soc from ${lastPlannedStop} to ${lastStop} will be under ${hardMinSoc}%`;
+      console.log(err);
+      return err;
     }
   }
+
+  return '';
 }
 
-async function plan(stops: Stop[], startTime: string, startSoc: number, maxSoc: number, minSoc: number, presets: Preset[], otherRequirement: string): Promise<AiPlanStep[]> {
+async function plan(stops: Stop[], startTime: string, startSoc: number, maxSoc: number, minSoc: number, presets: Preset[], otherRequirement: string, retry = 3, messages: any[] = []): Promise<AiPlanStep[]> {
   const prompt = `
 please assist the EV driver to make a recharging plan based on below info:
 **basic info**:
@@ -644,6 +679,10 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
                 type: 'string',
                 description: 'Current planned recharging service stop name'
               },
+              backupStop: {
+                type: 'string',
+                description: 'The backup service stop name for recharging in case the arrivalStop is out of service. Set this field to "" if no backupStop is needed.'
+              },
               arrivalTime: {
                 type: 'string',
                 description: 'The estimated time of arriving arrivalStop, format as: HH:MM, HH is from 00 to 23'
@@ -678,7 +717,7 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
                 }
               }
             },
-            required: ['fromStop', 'arrivalStop', 'arrivalTime', 'departureTime', 'socBeforeRecharge', 'socAfterRecharge', 'rechargeTime', 'tags'],
+            required: ['fromStop', 'arrivalStop', 'backupStop', 'arrivalTime', 'departureTime', 'socBeforeRecharge', 'socAfterRecharge', 'rechargeTime', 'tags'],
             additionalProperties: false
           }
         }
@@ -690,23 +729,23 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
   generate output which strictly follows below JSON schema:
   ${JSON.stringify(response_format)}`;
 
+  if (messages.length === 0) {
+    messages = [
+    {
+      role: 'system',
+      content: 'You are a helpful assistant for to help user make all kinds of accurate and efficient plans, when you are crunching numbers, double check the correctness of your calculation.'
+    },
+    {
+      content: prompt,
+      role: 'user'
+    }];
+  }
+
   const answer: string = await askLlm(
     openrouterHost,
     openrouterKey,
     chatModelO4Mini,
-    [
-      {
-        role: 'system',
-        content: [
-          {
-            type: "text",
-            text: 'You are a helpful assistant for to help user make all kinds of accurate and efficient plans, and always use a tool to perform calculations.'
-          }]
-      },
-      {
-        content: [{type: 'text', text: prompt}],
-        role: 'user'
-      }],
+    messages,
     response_format);
 
   const ret: any = JSON.parse(answer);
@@ -716,7 +755,23 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
   if (!ret.rechargingPlan || ret.rechargingPlan.length === 0) {
     throw new Error('no plan provided');
   }
-  return ret.rechargingPlan as AiPlanStep[];
+
+  const aiPlan = ret.rechargingPlan as AiPlanStep[];
+  let result = verifyPlan(aiPlan, stops, startTime);
+
+  if (result === '') return aiPlan;
+  if (--retry === 0) throw new Error('max retry reached.'); 
+  return await plan(stops, startTime, startSoc, maxSoc, minSoc, presets, otherRequirement, retry,
+    messages.concat([
+    {
+      role: 'assistant',
+      content: answer
+    },
+    {
+      role: 'user',
+      content: `${result}, review your plan and plan again.`
+    }
+  ]));
 }
 
 let callCnt = 0;
@@ -748,7 +803,6 @@ async function askLlm(host: string, key: string, model: string, messages: any[],
     if (callCnt > 20) {
       throw new Error('too many function calls');
     }
-    console.log('perform function calls');
     callCnt++;
     return await askLlm(host, key, model, messages.concat(functionCalls(response.tool_calls)), response_format);
   }
