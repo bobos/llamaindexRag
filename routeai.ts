@@ -478,11 +478,7 @@ async function sleep(sec: number): Promise<void> {
 
 enum Preset {
   conservative = `**conservative**:make sure there is always a backup service stop to recharge in case driver arrives at the planned service stop and finds out it is out of service, make sure soc is above ${hardMinSoc}% when car arrives the backup service stop.**tag**:None`,
-  aggressive = '**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:None',
-  breakfastCharge = '**recharging at breakfast time**:prioritize recharging during breakfast time.**tag**:用早餐充电',
-  lunchCharge = '**recharging at lunch time**:prioritize recharging during lunch time.**tag**:用午餐充电',
-  dinnerCharge = '**recharging at dinner time**:prioritize recharging during dinner time.**tag**:用晚餐充电',
-  avoidExpensiveWindow = '**avoid expensive charging window**:try to avoid recharging at 11:00 - 13:00, 17:00 - 23:00. **tag**:峰时电价,谷时电价',
+  aggressive = '**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:请注意该点充电桩情况'
 }
 
 interface AiPlanStep {
@@ -645,7 +641,7 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
 - ${presets.join('\n- ')}
 **driver's freely input requirements**:
 - freely input requirement takes prioritiy over the selected requirements
-- understand and try best to fulfill the input requirement, and create tags for them if applicable, each tag should be in Chinese and shoud not exceed 10 words 
+- understand and try best to fulfill the input requirement, and create tags for them if applicable, each tag should be in Chinese and shoud not exceed 12 words 
 - freely input requirements are following: ${otherRequirement}
   `;
 //- generate the recharging plan by strictly follow below format:
@@ -827,8 +823,8 @@ generateRoute(
   '广州市黄埔区中新知识城招商雍景湾',
   '桂林西站',
   '6:30', 100, 85, 8,
-  [Preset.conservative, Preset.lunchCharge],
-  '午餐时段可以充满至100%, 确保抵达终点时有至少15%的电').then(ret => console.log(ret));
+  [Preset.conservative],
+  '在早餐和午餐时段各安排一次充电,午餐时段充电充满到95%,尽量避免11:00 - 13:00高电价区间充电,保抵达终点时有至少15%的电').then(ret => console.log(ret));
 
 async function r(city: string, pageNum: number): Promise<any> {
   const reqUrl = `https://restapi.amap.com/v5/place/text?types=180300&key=d0e0aab6356af92b0cd0763cae27ba35&output=json&region=${city}&page_size=25&page_num=${pageNum}`;
