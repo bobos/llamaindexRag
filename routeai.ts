@@ -200,257 +200,6 @@ function getNearestStop(location: string, cities: City[]): Station | undefined {
 
 interface DistrictArea {[district: string]: Station[]};
 
-const GuangZhouServiceStops: DistrictArea = 
-{
-  '南沙区': [
-    {name: '潭洲服务区', location: '113.401198,22.759078', altitude: 8},
-    {name: '万顷沙服务区', location: '113.636476,22.580879', altitude: 0},
-    {name: '南沙停车区', location: '113.587856,22.769409', altitude: 9},
-  ],
-  '从化区': [
-    {name: '瓦窑岗服务区', location: '113.463673,23.613520', altitude: 42},
-    {name: '从化服务区', location: '113.646944,23.610815', altitude: 76},
-    {name: '鳌头停车区', location: '113.364255,23.638190', altitude: 58},
-    {name: '上塘服务区', location: '113.505864,23.527526', altitude: 68},
-    {name: '吕田服务区', location: '113.895347,23.817703', altitude: 232},
-    {name: '木棉服务区', location: '113.505955,23.498445', altitude: 33},
-    {name: '从化南服务区', location: '113.524327,23.449385', altitude: 66},
-  ],
-  '白云区': [
-    {name: '白云服务区', location: '113.268137,23.267584', altitude: 17},
-    {name: '沙贝服务区', location: '113.195275,23.154726', altitude: 23},
-  ],
-  '增城区': [
-    {name: '正果停车区', location: '113.904996,23.458983', altitude: 50},
-    {name: '南香山服务区', location: '113.643626,23.225485', altitude: 17},
-    {name: '朱村服务区', location: '113.712358,23.239584', altitude: 24},
-    {name: '沙埔服务区', location: '113.676422,23.189259', altitude: 22},
-    {name: '沙岗驿站', location: '113.736632,23.382122', altitude: 50},
-    {name: '荔城服务区', location: '113.785421,23.238048', altitude: 19},
-    {name: '新安服务区', location: '113.578183,23.376050', altitude: 92},
-    {name: '仙村服务区', location: '113.697883,23.159462', altitude: 5},
-    {name: '河洞服务区', location: '113.808374,23.438718', altitude: 24},
-  ],
-  '花都区': [
-    {name: '花城服务区', location: '113.313125,23.503162', altitude: 67},
-    {name: '炭步服务区', location: '113.067509,23.311997', altitude: 10},
-  ],
-  '番禺区': [
-    {name: '官桥服务区', location: '113.457426,22.987955', altitude: 6},
-    {name: '金山服务区', location: '113.265947,22.970051', altitude: 10},
-  ],
-  '黄埔区': [
-    {name: '仓头服务区', location: '113.551412,23.124518', altitude: 8},
-    {name: '中新服务区', location: '113.602678,23.310739', altitude: 13},
-    {name: '火村服务区', location: '113.489894,23.153703', altitude: 23},
-    {name: '和龙服务区', location: '113.419987,23.257411', altitude: 108},
-  ],
-  '天河区': [
-    {name: '黄村服务区', location: '113.403143,23.144632', altitude: 9},
-    {name: '广氮服务区', location: '113.384020,23.151452', altitude: 15},
-  ],
-  '海珠区': [
-    {name: '赤沙加油站', location: '113.350397,23.086840', altitude: 9},
-    {name: '华洲加油站', location: '113.344331,23.062008', altitude: 9},
-  ]
-}
-
-const FoShanServiceStops: DistrictArea = 
-{
-  "三水区": [
-    {name: '三水服务区', location: '112.896063,23.244388', altitude: 15},
-    {name: '大塘服务区', location: '112.980172,23.429447', altitude: 11},
-    {name: '范湖服务区', location: '113.027106,23.338264', altitude: 7}
-  ],
-  "南海区": [
-    {name: '沙涌加油站', location: '113.163602,23.137643', altitude: 6},
-    {name: '丹灶服务区', location: '112.900160,23.043781', altitude: 15},
-    {name: '狮山加油站', location: '112.995906,23.138756', altitude: 9}
-  ],
-  "高明区": [
-    {name: '明城停车区', location: '112.695781,22.946388', altitude: 32},
-    {name: '更合停车区', location: '112.499981,22.757366', altitude: 43},
-    {name: '松岗服务区', location: '112.824118,22.950590', altitude: 14}
-  ],
-  "顺德区": [
-    {name: '勒流服务区', location: '113.164969,22.840974', altitude: 10},
-    {name: '顺德服务区', location: '113.270005,22.917469', altitude: 10},
-    {name: '冲鹤服务区', location: '113.198885,22.781098', altitude: 13}
-  ],
-  "禅城区": [
-    {name: '罗格服务区', location: '113.011565,22.990880', altitude: 11}
-  ]
-}
-const ZhaoQingServiceStops: DistrictArea =
-{
-  "广宁县": [
-    {name: '广宁服务区', location: '112.437496,23.520699', altitude: 34},
-  ],
-  "鼎湖区": [
-    {name: '鼎湖山服务区', location: '112.627663,23.247110', altitude: 24},
-    {name: '鼎湖服务区', location: '112.695005,23.216631', altitude: 9}
-  ],
-  "封开县": [
-    {name: '金装服务区', location: '111.874010,23.775097', altitude: 74},
-    {name: '封开服务区', location: '111.555619,23.351069', altitude: 47},
-    {name: '南丰停车区', location: '111.807659,23.635221', altitude: 110},
-    {name: '罗董服务区', location: '111.646208,23.355565', altitude: 88}
-  ],
-  "高要区": [
-    {name: '水南服务区', location: '112.392459,23.291416', altitude: 59},
-    {name: '大湾服务区', location: '112.352400,23.044584', altitude: 20},
-    {name: '蚬岗服务区', location: '112.633448,23.049731', altitude: 26},
-    {name: '笋围停车区', location: '112.342382,23.183696', altitude: 20}
-  ],
-  "德庆县": [
-    {name: '宾村停车区', location: '111.719530,23.226553', altitude: 135},
-    {name: '高良停车区', location: '111.909494,23.236876', altitude: 75},
-    {name: '播植服务区', location: '112.088516,23.262082', altitude: 99},
-  ],
-  "怀集县": [
-    {name: '怀集服务区', location: '112.230754,23.976639', altitude: 119},
-    {name: '怀城服务区', location: '112.221792,23.812410', altitude: 52},
-    {name: '连麦停车区', location: '112.116338,24.022175', altitude: 81},
-    {name: '梁村停车区', location: '111.997930,23.968522', altitude: 86},
-  ],
-  "四会市": [
-    {name: '四会服务区', location: '112.539873,23.429049', altitude: 14},
-    {name: '地豆服务区', location: '112.688066,23.566828', altitude: 43},
-    {name: '龙甫服务区', location: '112.714164,23.377671', altitude: 15},
-    {name: '江谷停车区', location: '112.611892,23.447889', altitude: 72}
-  ]
-};
-const HeZhouServiceStops: DistrictArea =
-{
-  "平桂区": [
-    {name: '平桂服务区', location: '111.469749,24.494844', altitude: 169},
-  ],
-  "钟山县": [
-    {name: '清塘服务区', location: '111.123752,24.352925', altitude: 190},
-    {name: '钟山服务区', location: '111.276905,24.605468', altitude: 142},
-    {name: '同古服务区', location: '111.185664,24.394484', altitude: 176}
-  ],
-  "八步区": [
-    {name: '大桂山停车区', location: '111.695203,24.162302', altitude: 176},
-    {name: '信都服务区', location: '111.708496,24.047655', altitude: 100},
-    {name: '八步服务区', location: '111.715281,24.404130', altitude: 186},
-    {name: '白马服务区', location: '111.768104,24.020730', altitude: 76},
-    {name: '贺州服务区', location: '111.644819,24.347130', altitude: 141}
-  ],
-  "昭平县": [
-    {name: '昭平服务区', location: '110.815686,24.192409', altitude: 78},
-    {name: '黄姚停车区', location: '111.219973,24.175408', altitude: 194},
-    {name: '富罗服务区', location: '111.159073,24.035602', altitude: 80}
-  ],
-  "富川瑶族自治县": [
-    {name: '富川服务区', location: '111.272163,24.998497', altitude: 325}
-  ]
-}; 
-const GuiLinServiceStops: DistrictArea = 
-{
-  "永福县": [
-    {name: '百寿停车区', location: '109.724990,25.083270', altitude: 247},
-    {name: '永福服务区', location: '110.010994,25.037666', altitude: 183},
-  ],
-  "临桂区": [
-    {name: '五通服务区', location: '110.096766,25.410706', altitude: 236},
-    {name: '桂林服务区', location: '110.120394,25.217437', altitude: 165},
-    {name: '宛田服务区', location: '110.049585,25.626338', altitude: 363},
-    {name: '会仙服务区', location: '110.255057,25.089015', altitude: 137},
-    {name: '桂林两江服务区', location: '109.981355,25.151762', altitude: 186},
-    {name: '东山停车区', location: '110.327517,24.925521', altitude: 124},
-  ],
-  "平乐县": [
-    {name: '同安停车区', location: '110.981447,24.543884', altitude: 150},
-    {name: '平乐服务区', location: '110.720951,24.642464', altitude: 218},
-    {name: '平乐停车区', location: '110.660916,24.684125', altitude: 138}
-  ],
-  "资源县": [
-    {name: '中峰服务区', location: '110.610384,25.843576', altitude: 497},
-    {name: '八角寨服务区', location: '110.748699,26.226159', altitude: 432}
-  ],
-  "灌阳县": [
-    {name: '新圩服务区', location: '111.115495,25.611985', altitude: 435},
-    {name: '灌阳服务区', location: '111.182004,25.659212', altitude: 245},
-    {name: '新街停车区', location: '111.103910,25.428395', altitude: 283},
-    {name: '黄关服务区', location: '110.995157,25.314831', altitude: 315}
-  ],
-  "七星区": [
-    {name: '尧山服务区', location: '110.356147,25.265402', altitude: 142}
-  ],
-  "兴安县": [
-    {name: '兴安停车区', location: '110.652837,25.647829', altitude: 219},
-    {name: '溶江服务区', location: '110.512468,25.584283', altitude: 237}
-  ],
-  "灵川县": [
-    {name: '灵川服务区', location: '110.298757,25.381080', altitude: 176},
-  ],
-  "阳朔县": [
-    {name: '高田服务区', location: '110.431986,24.749543', altitude: 133},
-  ],
-  "全州县": [
-    {name: '全州停车区', location: '110.991880,25.893511', altitude: 174},
-    {name: '凤凰服务区', location: '110.818185,25.726099', altitude: 203},
-    {name: '石塘停车区', location: '111.014039,25.706926', altitude: 273},
-    {name: '全州服务区', location: '111.102540,26.010079', altitude: 185}
-  ],
-  "龙胜各族自治县": [
-    {name: '龙胜服务区', location: '109.946363,25.787543', altitude: 242},
-  ],
-  "荔浦市": [
-    {name: '荔浦服务区', location: '110.353673,24.532750', altitude: 177},
-    {name: '杜莫服务区', location: '110.439902,24.349638', altitude: 287}
-  ],
-  "恭城瑶族自治县": [
-    {name: '恭城服务区', location: '110.815611,24.886585', altitude: 166},
-    {name: '栗木停车区', location: '110.900364,25.090461', altitude: 188}
-  ]
-} 
-
-const LiuZhouServiceStops: DistrictArea = 
-{
-  "融水苗族自治县": [
-    {name: '融水服务区', location: '109.288116,25.165671', altitude: 151},
-    {name: '和睦服务区', location: '109.203820,24.915379', altitude: 110}
-  ],
-  "柳南区": [
-    {name: '柳北服务区', location: '109.305336,24.409348', altitude: 105}
-  ],
-  "三江侗族自治县": [
-    {name: '三江南服务区', location: '109.531378,25.719468', altitude: 206},
-    {name: '三江北服务区', location: '109.634494,25.826220', altitude: 192}
-  ],
-  "融安县": [
-    {name: '融安服务区', location: '109.380708,25.250808', altitude: 146},
-    {name: '沙子服务区', location: '109.455885,24.977038', altitude: 299}
-  ],
-  "鹿寨县": [
-    {name: '鹿寨服务区', location: '109.733880,24.454081', altitude: 99},
-    {name: '寨沙服务区', location: '110.018328,24.475256', altitude: 161},
-    {name: '波寨服务区', location: '109.889772,24.735192', altitude: 171}
-  ],
-  "柳江区": [
-    {name: '木团停车区', location: '109.430470,24.120566', altitude: 126},
-    {name: '新兴服务区', location: '109.401211,24.133533', altitude: 130},
-  ],
-  "鱼峰区": [
-    {name: '柳州服务区', location: '109.590193,24.229755', altitude: 94}
-  ],
-  "柳城县": [
-    {name: '柳城东服务区', location: '109.282548,24.618355', altitude: 147},
-    {name: '柳城服务区', location: '109.075045,24.522678', altitude: 183}
-  ]
-}
-
-const ServiceStops: {[city: string]: DistrictArea} = {
-  "广州市": GuangZhouServiceStops,
-  "佛山市": FoShanServiceStops,
-  "肇庆市": ZhaoQingServiceStops,
-  "贺州市": HeZhouServiceStops,
-  "桂林市": GuiLinServiceStops,
-  "柳州市": LiuZhouServiceStops
-}
-
 async function request(path: string): Promise<any> {
   await sleep(1);
   const reqUrl = `https://restapi.amap.com${path}&key=d0e0aab6356af92b0cd0763cae27ba35&output=json`;
@@ -819,16 +568,17 @@ function functionCalls(tool_calls: {function: {arguments: string, name: string},
   return messages;
 }
 
-generateRoute(
-  '广州市黄埔区中新知识城招商雍景湾',
-  '桂林西站',
-  '6:30', 100, 85, 8,
-  [Preset.conservative],
-  '在早餐和午餐时段各安排一次充电,午餐时段充电充满到95%,尽量避免11:00 - 13:00高电价区间充电,保抵达终点时有至少15%的电').then(ret => console.log(ret));
+//generateRoute(
+//  '广州市黄埔区中新知识城招商雍景湾',
+//  '桂林西站',
+//  '6:30', 100, 85, 8,
+//  [Preset.conservative],
+//  '在早餐和午餐时段各安排一次充电,午餐时段充电充满到95%,尽量避免11:00 - 13:00高电价区间充电,保抵达终点时有至少15%的电').then(ret => console.log(ret));
 
 async function r(city: string, pageNum: number): Promise<any> {
   const reqUrl = `https://restapi.amap.com/v5/place/text?types=180300&key=d0e0aab6356af92b0cd0763cae27ba35&output=json&region=${city}&page_size=25&page_num=${pageNum}`;
   let response: any = await fetch(reqUrl);
+  console.log(reqUrl);
 
   if (!response.ok) throw new Error(`network response was not ok ${response.statusText}`);
 
@@ -878,14 +628,13 @@ function calculateDistance(loc1: string, loc2: string): number {
   return Math.floor(R * c);
 }
 
-async function collectService(city: string, pageNum: number, allService: string[]): Promise<void> {
+async function collectService(city: string, pageNum: number = 1, allService: any[] = []): Promise<void> {
   let ret = await r(city, pageNum);
   if (!ret) {
     let all: string[] = [];
     let stops: any = {};
-    const pois: any[] = shuffleMap(allService);
-    pois.forEach(poi => {
-      const name = poi.name.split('(')[0];
+    allService.forEach(poi => {
+      const name = poi.name;
       if (!all.includes(name)) {
         all.push(name);
         let sub = stops[poi.adname];
@@ -894,6 +643,276 @@ async function collectService(city: string, pageNum: number, allService: string[
       }
     });
     console.log(stops);
+    return;
   }
   await collectService(city, pageNum+1, allService.concat(ret));
+}
+
+const GuangZhouServiceStops: DistrictArea = 
+{
+  '南沙区': [
+    {name: '潭洲服务区(东新高速东沙方向)', location: '113.401198,22.759078', altitude: 8}, 
+    {name: '潭洲服务区(东新高速新联方向)', location: '113.401042,22.757614', altitude: 8},
+    {name: '万顷沙服务区', location: '113.636476,22.580879', altitude: 0},
+    {name: '南沙停车区(莞佛高速佛山方向)', location: '113.587856,22.769409', altitude: 9},
+    {name: '南沙停车区(莞佛高速东莞方向)', location: '113.587666,22.767619', altitude: 9},
+  ],
+  '从化区': [
+    {name: '从化服务区(大广高速大庆方向)', location: '113.647661,23.609664', altitude: 76},
+    {name: '从化服务区(大广高速广州方向)', location: '113.646944,23.610815', altitude: 76},
+    {name: '鳌头停车区(广连高速连州方向)', location: '113.364255,23.638190', altitude: 58},
+    {name: '鳌头停车区(广连高速广州方向)', location: '113.363179,23.637761', altitude: 58},
+    {name: '上塘服务区(佛清从高速佛山方向)', location: '113.505864,23.527526', altitude: 68}, 
+    {name: '上塘服务区(佛清从高速从化方向)', location: '113.505225,23.526373', altitude: 68},
+    {name: '吕田服务区(大广高速广州方向)', location: '113.895669,23.819124', altitude: 232},
+    {name: '吕田服务区(大广高速大庆方向)', location: '113.895347,23.817703', altitude: 232},
+    {name: '木棉服务区(大广高速大庆方向)', location: '113.505955,23.498445', altitude: 33},
+    {name: '木棉服务区(大广高速广州方向)', location: '113.504990,23.499368', altitude: 33},
+    {name: '从化南服务区(从埔高速从化方向)', location: '113.524327,23.449385', altitude: 66},
+    {name: '从化南服务区(从埔高速黄埔方向)', location: '113.522569,23.450287', altitude: 66},
+  ],
+  '白云区': [
+    {name: '白云服务区(机场高速白云机场方向)', location: '113.269386,23.267017', altitude: 17},
+    {name: '白云服务区(机场高速广州方向)', location: '113.268137,23.267584', altitude: 17},
+    {name: '沙贝服务区(广佛高速佛山方向)', location: '113.195275,23.154726', altitude: 23}, 
+    {name: '沙贝服务区(广佛高速广州方向)', location: '113.194968,23.153367', altitude: 23},
+    {name: '和龙服务区(京港澳高速深圳方向)', location: '113.419987,23.257411', altitude: 108},
+  ],
+  '增城区': [
+    {name: '正果停车区(广河高速广州方向)', location: '113.903870,23.458933', altitude: 50},
+    {name: '正果停车区(广河高速河源方向)', location: '113.904996,23.458983', altitude: 50},
+    {name: '南香山服务区(花莞高速东莞方向)', location: '113.641978,23.223890', altitude: 17},
+    {name: '南香山服务区(花莞高速花都方向)', location: '113.643626,23.225485', altitude: 17},
+    {name: '沙埔服务区(济广高速济南方向)', location: '113.675231,23.187070', altitude: 22},
+    {name: '沙埔服务区(济广高速广州方向)', location: '113.676422,23.189259', altitude: 22},
+    {name: '沙岗驿站', location: '113.736632,23.382122', altitude: 50},
+    {name: '荔城服务区', location: '113.785421,23.238048', altitude: 19},
+    {name: '新安服务区', location: '113.578183,23.376050', altitude: 92},
+    {name: '仙村服务区', location: '113.697883,23.159462', altitude: 5},
+    {name: '河洞服务区(从莞深高速从化方向)', location: '113.808866,23.440458', altitude: 24},
+    {name: '河洞服务区(从莞深高速东莞方向)', location: '113.808374,23.438718', altitude: 24},
+  ],
+  '花都区': [
+    {name: '花城服务区(乐广高速广州方向)', location: '113.313125,23.503162', altitude: 67},
+    {name: '炭步服务区(沈海高速海口方向)', location: '113.068275,23.314411', altitude: 10},
+    {name: '炭步服务区(沈海高速沈阳方向)', location: '113.067509,23.311997', altitude: 10},
+  ],
+  '番禺区': [
+    {name: '金山服务区(广台高速台山方向)', location: '113.266747,22.971264', altitude: 10},
+    {name: '金山服务区(广台高速广州方向)', location: '113.265947,22.970051', altitude: 10},
+    {name: '官桥服务区(广澳高速广州方向)', location: '113.458891,22.988612', altitude: 6},
+    {name: '官桥服务区(广澳高速澳门方向)', location: '113.457426,22.987955', altitude: 6},
+  ],
+  '黄埔区': [
+    {name: '仓头服务区', location: '113.551412,23.124518', altitude: 8},
+    {name: '中新服务区(广河高速河源方向)', location: '113.602678,23.310739', altitude: 13},
+    {name: '中新服务区(广河高速广州方向)', location: '113.602138,23.312123', altitude: 13},
+    {name: '火村服务区', location: '113.489894,23.153703', altitude: 23},
+    {name: '和龙服务区(京港澳高速北京方向)', location: '113.476931,23.219530', altitude: 68},
+  ],
+  '天河区': [
+    {name: '黄村服务区', location: '113.403143,23.144632', altitude: 9},
+    {name: '广氮服务区(沈海高速广州支线沈阳方向)', location: '113.383248,23.150448', altitude: 15},
+    {name: '广氮服务区(沈海高速广州支线海口方向)', location: '113.384020,23.151452', altitude: 15},
+  ],
+  '海珠区': [
+    {name: '赤沙加油站', location: '113.350397,23.086840', altitude: 9},
+    {name: '华洲加油站', location: '113.344331,23.062008', altitude: 9},
+  ]
+}
+
+const FoShanServiceStops: DistrictArea = 
+{
+  "三水区": [
+    {name: '三水服务区', location: '112.896063,23.244388', altitude: 15},
+    {name: '大塘服务区', location: '112.980172,23.429447', altitude: 11},
+    {name: '范湖服务区', location: '113.027106,23.338264', altitude: 7}
+  ],
+  "南海区": [
+    {name: '沙涌加油站', location: '113.163602,23.137643', altitude: 6},
+    {name: '丹灶服务区', location: '112.900160,23.043781', altitude: 15},
+    {name: '狮山加油站', location: '112.995906,23.138756', altitude: 9}
+  ],
+  "高明区": [
+    {name: '明城停车区', location: '112.695781,22.946388', altitude: 32},
+    {name: '更合停车区', location: '112.499981,22.757366', altitude: 43},
+    {name: '松岗服务区', location: '112.824118,22.950590', altitude: 14}
+  ],
+  "顺德区": [
+    {name: '勒流服务区', location: '113.164969,22.840974', altitude: 10},
+    {name: '顺德服务区', location: '113.270005,22.917469', altitude: 10},
+    {name: '冲鹤服务区', location: '113.198885,22.781098', altitude: 13}
+  ],
+  "禅城区": [
+    {name: '罗格服务区', location: '113.011565,22.990880', altitude: 11}
+  ]
+}
+const ZhaoQingServiceStops: DistrictArea =
+{
+  "广宁县": [
+    {name: '广宁服务区', location: '112.437496,23.520699', altitude: 34},
+  ],
+  "鼎湖区": [
+    {name: '鼎湖山服务区', location: '112.627663,23.247110', altitude: 24},
+    {name: '鼎湖服务区', location: '112.695005,23.216631', altitude: 9}
+  ],
+  "封开县": [
+    {name: '金装服务区', location: '111.874010,23.775097', altitude: 74},
+    {name: '封开服务区', location: '111.555619,23.351069', altitude: 47},
+    {name: '南丰停车区', location: '111.807659,23.635221', altitude: 110},
+    {name: '罗董服务区', location: '111.646208,23.355565', altitude: 88}
+  ],
+  "高要区": [
+    {name: '水南服务区', location: '112.392459,23.291416', altitude: 59},
+    {name: '大湾服务区', location: '112.352400,23.044584', altitude: 20},
+    {name: '蚬岗服务区', location: '112.633448,23.049731', altitude: 26},
+    {name: '笋围停车区', location: '112.342382,23.183696', altitude: 20}
+  ],
+  "德庆县": [
+    {name: '宾村停车区', location: '111.719530,23.226553', altitude: 135},
+    {name: '高良停车区', location: '111.909494,23.236876', altitude: 75},
+    {name: '播植服务区', location: '112.088516,23.262082', altitude: 99},
+  ],
+  "怀集县": [
+    {name: '怀集服务区', location: '112.230754,23.976639', altitude: 119},
+    {name: '怀城服务区', location: '112.221792,23.812410', altitude: 52},
+    {name: '连麦停车区', location: '112.116338,24.022175', altitude: 81},
+    {name: '梁村停车区', location: '111.997930,23.968522', altitude: 86},
+  ],
+  "四会市": [
+    {name: '四会服务区', location: '112.539873,23.429049', altitude: 14},
+    {name: '地豆服务区', location: '112.688066,23.566828', altitude: 43},
+    {name: '龙甫服务区', location: '112.714164,23.377671', altitude: 15},
+    {name: '江谷停车区', location: '112.611892,23.447889', altitude: 72}
+  ]
+};
+const HeZhouServiceStops: DistrictArea =
+{
+  "平桂区": [
+    {name: '平桂服务区', location: '111.469749,24.494844', altitude: 169},
+  ],
+  "钟山县": [
+    {name: '清塘服务区', location: '111.123752,24.352925', altitude: 190},
+    {name: '钟山服务区', location: '111.276905,24.605468', altitude: 142},
+    {name: '同古服务区', location: '111.185664,24.394484', altitude: 176}
+  ],
+  "八步区": [
+    {name: '大桂山停车区', location: '111.695203,24.162302', altitude: 176},
+    {name: '信都服务区', location: '111.708496,24.047655', altitude: 100},
+    {name: '八步服务区', location: '111.715281,24.404130', altitude: 186},
+    {name: '白马服务区', location: '111.768104,24.020730', altitude: 76},
+    {name: '贺州服务区', location: '111.644819,24.347130', altitude: 141}
+  ],
+  "昭平县": [
+    {name: '昭平服务区', location: '110.815686,24.192409', altitude: 78},
+    {name: '黄姚停车区', location: '111.219973,24.175408', altitude: 194},
+    {name: '富罗服务区', location: '111.159073,24.035602', altitude: 80}
+  ],
+  "富川瑶族自治县": [
+    {name: '富川服务区', location: '111.272163,24.998497', altitude: 325}
+  ]
+}; 
+const GuiLinServiceStops: DistrictArea = 
+{
+  "永福县": [
+    {name: '百寿停车区', location: '109.724990,25.083270', altitude: 247},
+    {name: '永福服务区', location: '110.010994,25.037666', altitude: 183},
+  ],
+  "临桂区": [
+    {name: '五通服务区', location: '110.096766,25.410706', altitude: 236},
+    {name: '桂林服务区', location: '110.120394,25.217437', altitude: 165},
+    {name: '宛田服务区', location: '110.049585,25.626338', altitude: 363},
+    {name: '会仙服务区', location: '110.255057,25.089015', altitude: 137},
+    {name: '桂林两江服务区', location: '109.981355,25.151762', altitude: 186},
+    {name: '东山停车区', location: '110.327517,24.925521', altitude: 124},
+  ],
+  "平乐县": [
+    {name: '同安停车区', location: '110.981447,24.543884', altitude: 150},
+    {name: '平乐服务区', location: '110.720951,24.642464', altitude: 218},
+    {name: '平乐停车区', location: '110.660916,24.684125', altitude: 138}
+  ],
+  "资源县": [
+    {name: '中峰服务区', location: '110.610384,25.843576', altitude: 497},
+    {name: '八角寨服务区', location: '110.748699,26.226159', altitude: 432}
+  ],
+  "灌阳县": [
+    {name: '新圩服务区', location: '111.115495,25.611985', altitude: 435},
+    {name: '灌阳服务区', location: '111.182004,25.659212', altitude: 245},
+    {name: '新街停车区', location: '111.103910,25.428395', altitude: 283},
+    {name: '黄关服务区', location: '110.995157,25.314831', altitude: 315}
+  ],
+  "七星区": [
+    {name: '尧山服务区', location: '110.356147,25.265402', altitude: 142}
+  ],
+  "兴安县": [
+    {name: '兴安停车区', location: '110.652837,25.647829', altitude: 219},
+    {name: '溶江服务区', location: '110.512468,25.584283', altitude: 237}
+  ],
+  "灵川县": [
+    {name: '灵川服务区', location: '110.298757,25.381080', altitude: 176},
+  ],
+  "阳朔县": [
+    {name: '高田服务区', location: '110.431986,24.749543', altitude: 133},
+  ],
+  "全州县": [
+    {name: '全州停车区', location: '110.991880,25.893511', altitude: 174},
+    {name: '凤凰服务区', location: '110.818185,25.726099', altitude: 203},
+    {name: '石塘停车区', location: '111.014039,25.706926', altitude: 273},
+    {name: '全州服务区', location: '111.102540,26.010079', altitude: 185}
+  ],
+  "龙胜各族自治县": [
+    {name: '龙胜服务区', location: '109.946363,25.787543', altitude: 242},
+  ],
+  "荔浦市": [
+    {name: '荔浦服务区', location: '110.353673,24.532750', altitude: 177},
+    {name: '杜莫服务区', location: '110.439902,24.349638', altitude: 287}
+  ],
+  "恭城瑶族自治县": [
+    {name: '恭城服务区', location: '110.815611,24.886585', altitude: 166},
+    {name: '栗木停车区', location: '110.900364,25.090461', altitude: 188}
+  ]
+} 
+
+const LiuZhouServiceStops: DistrictArea = 
+{
+  "融水苗族自治县": [
+    {name: '融水服务区', location: '109.288116,25.165671', altitude: 151},
+    {name: '和睦服务区', location: '109.203820,24.915379', altitude: 110}
+  ],
+  "柳南区": [
+    {name: '柳北服务区', location: '109.305336,24.409348', altitude: 105}
+  ],
+  "三江侗族自治县": [
+    {name: '三江南服务区', location: '109.531378,25.719468', altitude: 206},
+    {name: '三江北服务区', location: '109.634494,25.826220', altitude: 192}
+  ],
+  "融安县": [
+    {name: '融安服务区', location: '109.380708,25.250808', altitude: 146},
+    {name: '沙子服务区', location: '109.455885,24.977038', altitude: 299}
+  ],
+  "鹿寨县": [
+    {name: '鹿寨服务区', location: '109.733880,24.454081', altitude: 99},
+    {name: '寨沙服务区', location: '110.018328,24.475256', altitude: 161},
+    {name: '波寨服务区', location: '109.889772,24.735192', altitude: 171}
+  ],
+  "柳江区": [
+    {name: '木团停车区', location: '109.430470,24.120566', altitude: 126},
+    {name: '新兴服务区', location: '109.401211,24.133533', altitude: 130},
+  ],
+  "鱼峰区": [
+    {name: '柳州服务区', location: '109.590193,24.229755', altitude: 94}
+  ],
+  "柳城县": [
+    {name: '柳城东服务区', location: '109.282548,24.618355', altitude: 147},
+    {name: '柳城服务区', location: '109.075045,24.522678', altitude: 183}
+  ]
+}
+
+const ServiceStops: {[city: string]: DistrictArea} = {
+  "广州市": GuangZhouServiceStops,
+  "佛山市": FoShanServiceStops,
+  "肇庆市": ZhaoQingServiceStops,
+  "贺州市": HeZhouServiceStops,
+  "桂林市": GuiLinServiceStops,
+  "柳州市": LiuZhouServiceStops
 }
