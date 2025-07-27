@@ -84,7 +84,7 @@ async function collectStops(startStation: Station, endStation: Station): Promise
     const polylines: string[] = step.polyline.split(';').splice(1);
     const incre = Math.floor(polylines.length / Math.floor(distance / 2000)); // scan at every 2KM
     for (let index=0; index < polylines.length; index += incre) {
-      const ret: Station|undefined = getNearestStop(polylines[index], step.cities);
+      const ret: Station|undefined = await getNearestStop(polylines[index], step.cities, prevStation);
       if (ret !== undefined && ret.name !== prevStation.name) {
         stops.push(await getStopRecord(prevStation, ret));
         prevStation = ret;
@@ -180,19 +180,37 @@ function simpleCalculator(arithmeticExpression: string): string {
   return eval(arithmeticExpression).toFixed(2);
 }
 
-function getNearestStop(location: string, cities: City[]): Station | undefined {
+async function getNearestStop(location: string, cities: City[], prevStation: Station): Promise<Station | undefined> {
   for (const city of cities) {
     const stops: DistrictArea | undefined = ServiceStops[city.city];
     if (!stops) throw new Error(`没有服务数据: ${city.city}`);
 
+    let found: Station|undefined = undefined;
     for (const district of city.districts) {
       const sa: Station[] = stops[district.name];
       if (!sa) continue;
       for (const s of sa) {
         if (calculateDistance(location, s.location) <= 500) { //小于500米
-          return s;
+          found = s;
         }
       }
+    }
+
+    if (found) {
+      let distance = (await getPath(prevStation.location, found.location)).distance;
+      const matchStr = found.name.split("(")[0];
+      for (const district in stops) {
+        for (const s of stops[district]) {
+          if (s.name.startsWith(matchStr)) {
+            let newDist = (await getPath(prevStation.location, s.location)).distance;
+            if (newDist < distance) {
+              found = s;
+              distance = newDist;
+            }
+          }
+        }
+      }
+      return found;
     }
   }
   return;
@@ -568,12 +586,12 @@ function functionCalls(tool_calls: {function: {arguments: string, name: string},
   return messages;
 }
 
-//generateRoute(
-//  '广州市黄埔区中新知识城招商雍景湾',
-//  '桂林西站',
-//  '6:30', 100, 85, 8,
-//  [Preset.conservative],
-//  '在早餐和午餐时段各安排一次充电,午餐时段充电充满到95%,尽量避免11:00 - 13:00高电价区间充电,保抵达终点时有至少15%的电').then(ret => console.log(ret));
+generateRoute(
+  '广州市黄埔区中新知识城招商雍景湾',
+  '桂林西站',
+  '6:30', 100, 85, 8,
+  [Preset.conservative],
+  '在早餐和午餐时段各安排一次充电,午餐时段充电充满到95%,尽量避免11:00 - 13:00高电价区间充电,保抵达终点时有至少15%的电').then(ret => console.log(ret));
 
 async function r(city: string, pageNum: number): Promise<any> {
   const reqUrl = `https://restapi.amap.com/v5/place/text?types=180300&key=d0e0aab6356af92b0cd0763cae27ba35&output=json&region=${city}&page_size=25&page_num=${pageNum}`;
