@@ -1,9 +1,10 @@
 const KwhPer120PerKm = 17.2 * 0.01; //65%
+const KwhPer80PerKm = 14 * 0.01; //80%
 const Weight = 2.1;
 const chargeEffe = 0.92;
 const chargeSpeed = 70;
 const J2KwhFactor = 3.6e6;
-const maxBattery = 61;
+const maxBattery = 59.5;
 const hardMinSoc = 5;
 
 interface Step {
@@ -64,17 +65,22 @@ function getGravityEnergyKwh(distance: number, weight: number, altitudeDiff: num
 }
 
 async function generateRoute(startAddress: string, destAddres: string, startTime: string, startSoc: number, maxSoc: number, minSoc: number, presets: Preset[], otherRequirement: string): Promise<AiPlanStep[]> {
-  const stops = await collectStops(
+  const {stops, totalConsumption} = await collectStops(
   {location: await convLocation(startAddress), name: startAddress},
   {location: await convLocation(destAddres), name: destAddres});
   console.log(stops);
+  if (maxBattery * (1 - minSoc) >= totalConsumption) {
+    alert('enough soc left, no need to plan charging');
+    return [];
+  }
   const aiPlan: AiPlanStep[] = await plan(stops, startTime, startSoc, maxSoc, minSoc, presets, otherRequirement);
   return aiPlan;
 }
 
-async function collectStops(startStation: Station, endStation: Station): Promise<Stop[]> {
+async function collectStops(startStation: Station, endStation: Station): Promise<{stops: Stop[], totalConsumption: number}> {
   const stops: Stop[] = [];
   let prevStation = startStation;
+  let totalConsumption = 0;
   const path = await getPath(startStation.location, endStation.location);
 
   for (const step of path.steps) {
@@ -86,25 +92,33 @@ async function collectStops(startStation: Station, endStation: Station): Promise
     for (let index=0; index < polylines.length; index += incre) {
       const ret: Station|undefined = await getNearestStop(polylines[index], step.cities, prevStation);
       if (ret !== undefined && ret.name !== prevStation.name) {
-        stops.push(await getStopRecord(prevStation, ret));
+        const nextStop = await getStopRecord(prevStation, ret);
+        stops.push(nextStop);
+        totalConsumption += nextStop.consumedBattery;
         prevStation = ret;
       }
     }
   }
 
   if (prevStation.name !== endStation.name) {
-    stops.push(await getStopRecord(prevStation, endStation));
+    const nextStop = await getStopRecord(prevStation, endStation);
+    stops.push(nextStop);
+    totalConsumption += nextStop.consumedBattery;
   }
 
-  return stops;
+  return {stops, totalConsumption};
 }
 
 async function getStopRecord(fromStop: Station, targetStop: Station): Promise<Stop> {
   const path: Path = await getPath(fromStop.location, targetStop.location); 
+  let consumedBattery = 0;
+  for(const step of path.steps) {
+    consumedBattery += (parseInt(step.step_distance) / 1000) * (step.cost.toll_road ? KwhPer120PerKm : KwhPer80PerKm);
+  }
+
   const distKm = Math.ceil(parseInt(path.distance) / 1000);
   const tags: string[] = [];
 
-  let consumedBattery = distKm * KwhPer120PerKm;
   if (fromStop.altitude !== undefined && targetStop.altitude !== undefined) {
     const altDiff = targetStop.altitude - fromStop.altitude;
     consumedBattery += getGravityEnergyKwh(distKm, Weight, altDiff);
@@ -588,10 +602,10 @@ function functionCalls(tool_calls: {function: {arguments: string, name: string},
 
 generateRoute(
   '广州市黄埔区中新知识城招商雍景湾',
-  '桂林西站',
-  '6:30', 100, 85, 8,
+  '贵州省贵阳市开阳县双流镇中学',
+  '6:30', 100, 90, 10,
   [Preset.conservative],
-  '在早餐和午餐时段各安排一次充电,午餐时段充电充满到95%,尽量避免11:00 - 13:00高电价区间充电,保抵达终点时有至少15%的电').then(ret => console.log(ret));
+  '在早餐和午餐时段各安排一次充电,午餐时段充电充满到100%,尽量避免11:00 - 13:00高电价区间充电,保抵达终点时有至少15%的电').then(ret => console.log(ret));
 
 async function r(city: string, pageNum: number): Promise<any> {
   const reqUrl = `https://restapi.amap.com/v5/place/text?types=180300&key=d0e0aab6356af92b0cd0763cae27ba35&output=json&region=${city}&page_size=25&page_num=${pageNum}`;
@@ -1174,7 +1188,7 @@ const GuiYangServiceStops: DistrictArea ={
     {name: '花溪服务区', location: '106.595218,26.415355', altitude: 1194},
     {name: '孟关停车区(银百高速百色方向)', location: '106.744590,26.392173', altitude: 1103},
   ]
-},
+}
 
 const BiJieServiceStops: DistrictArea = {
   "七星关区": [
@@ -1266,7 +1280,7 @@ const BiJieServiceStops: DistrictArea = {
     {name: '黔西服务区(仁望高速望谟方向)', location: '105.973706,26.969714', altitude: 1274},
     {name: '六广河服务区(江黔高速黔西方向)', location: '106.398980,27.072426', altitude: 1072},
   ]
-},
+}
 
 const LiuPanShuiServiceStops: DistrictArea = {
   "六枝特区": [
@@ -1413,6 +1427,135 @@ const QianXiNanServiceStops: DistrictArea = {
   ]
 }
 
+const ZunYiServiceStops: DistrictArea = {
+  "习水县": [
+    {name: '习水服务区(江习古高速古蔺方向)', location: '106.232411,28.301771', altitude: 1243},
+    {name: '习水服务区(江习古高速江津方向)', location: '106.231512,28.299381', altitude: 1243},
+    {name: '向阳服务区(蓉遵高速成都方向)', location: '106.212073,28.227427', altitude: 1074},
+    {name: '向阳服务区(蓉遵高速遵义方向)', location: '106.211797,28.226268', altitude: 1074},
+    {name: '飞鸽子服务区(江习古高速江津方向)', location: '106.549543,28.560660', altitude: 1047},
+    {name: '飞鸽子服务区(江习古高速古蔺方向)', location: '106.547395,28.560947', altitude: 1047},
+    {name: '土城停车区(蓉遵高速成都方向)', location: '105.980001,28.286460', altitude: 318},
+    {name: '良村服务区(江习古高速江津方向)', location: '106.426918,28.402322', altitude: 1054},
+  ],
+  "仁怀市": [
+    {name: '团结服务区(蓉遵高速遵义方向)', location: '106.413016,28.144624', altitude: 724},
+    {name: '团结服务区(蓉遵高速成都方向)', location: '106.415290,28.143110', altitude: 724},
+    {name: '千年国·仁怀服务区(仁望高速望谟方向)', location: '106.381963,27.764000', altitude: 781},
+    {name: '千年国·仁怀服务区(仁望高速仁怀方向)', location: '106.382869,27.764360', altitude: 781},
+    {name: '亭子台停车区(蓉遵高速遵义方向)', location: '106.438317,27.902752', altitude: 1099},
+    {name: '亭子台停车区(蓉遵高速成都方向)', location: '106.439716,27.903772', altitude: 1099},
+  ],
+  "余庆县": [
+    {name: '余庆服务区(江黔高速江口方向)', location: '107.918224,27.254485', altitude: 607},
+    {name: '余庆服务区(江黔高速黔西方向)', location: '107.917552,27.255935', altitude: 607},
+    {name: '飞龙湖服务区(银百高速百色方向)', location: '107.518067,27.399849', altitude: 733},
+    {name: '飞龙湖服务区(银百高速银川方向)', location: '107.519246,27.398953', altitude: 733},
+    {name: '沙堆停车区(玉新高速新蒲新区方向)', location: '107.705772,27.598332', altitude: 873},
+    {name: '沙堆停车区(玉新高速玉屏方向)', location: '107.704622,27.597296', altitude: 873},
+    {name: '龙家停车区(银百高速百色方向)', location: '107.534880,27.538087', altitude: 742},
+    {name: '龙家停车区(银百高速银川方向)', location: '107.536092,27.538530', altitude: 742},
+    {name: '小腮服务区(施播高速播州方向)', location: '107.798215,27.254937', altitude: 666},
+  ],
+  "凤冈县": [
+    {name: '凤冈停车区(杭瑞高速瑞丽方向)', location: '107.643219,27.884271', altitude: 811},
+    {name: '凤冈停车区(杭瑞高速杭州方向)', location: '107.644030,27.883275', altitude: 811},
+  ],
+  "务川仡佬族苗族自治县": [
+    {name: '涪洋服务区(德习高速德江方向)', location: '107.720529,28.490299', altitude: 669},
+    {name: '涪洋服务区(德习高速习水方向)', location: '107.720720,28.491917', altitude: 669},
+    {name: '楠杆服务区(德习高速德江方向)', location: '107.880041,28.368467', altitude: 724},
+  ],
+  "播州区": [
+    {name: '乌江服务区(兰海高速兰州方向)', location: '106.767114,27.270323', altitude: 814},
+    {name: '乌江服务区(兰海高速海口方向)', location: '106.765731,27.266931', altitude: 814},
+    {name: '尚嵇乌江服务区(渝筑高速重庆方向)', location: '107.008787,27.360021', altitude: 778},
+    {name: '尚嵇乌江服务区(渝筑高速贵阳方向)', location: '107.007200,27.362193', altitude: 778},
+    {name: '遵义停车区(杭瑞高速瑞丽方向)', location: '106.906048,27.597444', altitude: 881},
+    {name: '遵义停车区(杭瑞高速杭州方向)', location: '106.906383,27.595634', altitude: 881},
+    {name: '水洋湾服务区(杭瑞高速瑞丽方向)', location: '106.653754,27.586979', altitude: 894},
+    {name: '水洋湾服务区(杭瑞高速杭州方向)', location: '106.631022,27.582417', altitude: 894},
+    {name: '龙山加油站(兰海高速兰州方向)', location: '106.847950,27.548650', altitude: 921},
+    {name: '龙山加油站(兰海高速海口方向)', location: '106.847107,27.547736', altitude: 921},
+    {name: '白腊坎服务区(仁望高速仁怀方向)', location: '106.574585,27.586849', altitude: 943},
+    {name: '乐意坝停车区', location: '106.715106,27.531655', altitude: 882},
+    {name: '泮水服务区(新金高速红花岗方向)', location: '106.339949,27.560106', altitude: 1004},
+    {name: '泮水服务区(新金高速金沙方向)', location: '106.338682,27.558214', altitude: 1004},
+    {name: '肇新场服务区', location: '106.979043,27.500626', altitude: 988},
+    {name: '石壁加油站(杭瑞高速杭州方向)', location: '106.477637,27.528971', altitude: 892},
+    {name: '石壁加油站(杭瑞高速瑞丽方向)', location: '106.478128,27.529608', altitude: 892},
+    {name: '团溪服务区(施播高速施秉方向)', location: '107.169623,27.480988', altitude: 905},
+    {name: '大发渠停车区(仁遵高速遵义方向)', location: '106.558225,27.799923', altitude: 903},
+    {name: '大发渠停车区(仁遵高速仁怀方向)', location: '106.558598,27.802598', altitude: 903},
+  ],
+  "桐梓县": [
+    {name: '大娄山服务区(渝筑高速贵阳方向)', location: '106.873783,28.372186', altitude: 743},
+    {name: '大娄山服务区(渝筑高速重庆方向)', location: '106.875293,28.371595', altitude: 743},
+    {name: '桐梓服务区(兰海高速海口方向)', location: '106.831239,28.101942', altitude: 929},
+    {name: '桐梓服务区(兰海高速兰州方向)', location: '106.832299,28.102501', altitude: 929},
+    {name: '松坎服务区(兰海高速海口方向)', location: '106.842127,28.423831', altitude: 466},
+    {name: '松坎服务区(兰海高速兰州方向)', location: '106.836236,28.494875', altitude: 466},
+    {name: '茅石停车区(渝筑高速重庆方向)', location: '106.931939,28.233091', altitude: 1092},
+    {name: '夜郎服务区', location: '106.796929,28.402438', altitude: 573},
+    {name: '凉风垭停车区(兰海高速兰州方向)', location: '106.840051,28.235497', altitude: 1053},
+    {name: '凉风垭停车区(兰海高速海口方向)', location: '106.838899,28.236158', altitude: 1053},
+    {name: '花秋服务区(新金高速新浦方向)', location: '106.555026,28.043406', altitude: 889},
+    {name: '花秋服务区(新金高速金沙方向)', location: '106.553756,28.045205', altitude: 889},
+    {name: '水银河停车区(印习高速习水方向)', location: '106.908510,28.616893', altitude: 472},
+  ],
+  "正安县": [
+    {name: '正安服务区(银百高速百色方向)', location: '107.450567,28.490188', altitude: 611},
+    {name: '正安服务区(银百高速银川方向)', location: '107.451387,28.488906', altitude: 611},
+    {name: '米粮停车区(银百高速银川方向)', location: '107.438254,28.389502', altitude: 646},
+  ],
+  "汇川区": [
+    {name: '团泽服务区(渝筑高速重庆方向)', location: '107.123613,27.776019', altitude: 903},
+    {name: '团泽服务区(渝筑高速贵阳方向)', location: '107.121592,27.776204', altitude: 903},
+    {name: '高坪停车区(兰海高速兰州方向)', location: '106.920022,27.805824', altitude: 900},
+    {name: '高坪停车区(兰海高速海口方向)', location: '106.919395,27.805395', altitude: 900},
+    {name: '板桥停车区(渝筑高速贵阳方向)', location: '106.965110,28.000866', altitude: 1208},
+  ],
+  "湄潭县": [
+    {name: '湄潭南服务区(玉新高速玉屏方向)', location: '107.512239,27.651399', altitude: 882},
+    {name: '湄潭南服务区(玉新高速新蒲新区方向)', location: '107.512694,27.652677', altitude: 882},
+    {name: '西河服务区(银百高速百色方向)', location: '107.493892,28.111267', altitude: 997},
+    {name: '西河服务区(银百高速银川方向)', location: '107.495673,28.111143', altitude: 997},
+    {name: '湄潭服务区(杭瑞高速杭州方向)', location: '107.450178,27.762122', altitude: 790},
+    {name: '湄潭服务区(杭瑞高速瑞丽方向)', location: '107.450095,27.764532', altitude: 790},
+    {name: '湄潭东服务区(银百高速银川方向)', location: '107.520344,27.770349', altitude: 787},
+    {name: '湄潭东服务区(银百高速百色方向)', location: '107.518303,27.770502', altitude: 787},
+    {name: '乌江服务区(施播高速播州方向)', location: '107.417315,27.412260', altitude: 767},
+    {name: '乌江服务区(施播高速施秉方向)', location: '107.417000,27.410381', altitude: 767},
+  ],
+  "红花岗区": [
+    {name: '虾子服务区(杭瑞高速瑞丽方向)', location: '107.153179,27.660968', altitude: 786},
+    {name: '虾子服务区(杭瑞高速杭州方向)', location: '107.152668,27.659487', altitude: 786},
+    {name: '遵义服务区(兰海高速海口方向)', location: '106.881061,27.652210', altitude: 853},
+    {name: '遵义服务区(兰海高速兰州方向)', location: '106.882349,27.652419', altitude: 853},
+    {name: '金鼎山服务区(仁遵高速遵义方向)', location: '106.762491,27.732409', altitude: 944},
+    {name: '金鼎山服务区(仁遵高速仁怀方向)', location: '106.766879,27.733578', altitude: 944},
+    {name: '海龙服务区', location: '106.850481,27.755003', altitude: 902},
+  ],
+  "绥阳县": [
+    {name: '绥阳南服务区(新金高速金沙方向)', location: '107.235797,27.950107', altitude: 948},
+    {name: '绥阳南服务区(新金高速红花岗方向)', location: '107.233858,27.949501', altitude: 948},
+    {name: '蒲场服务区(渝筑高速贵阳方向)', location: '107.066302,27.902534', altitude: 886},
+    {name: '蒲场服务区(渝筑高速重庆方向)', location: '107.068091,27.903316', altitude: 886},
+    {name: '旺草服务区(务遵高速遵义方向)', location: '107.284452,28.118314', altitude: 714},
+    {name: '绥阳停车区(绥遵高速绥阳方向)', location: '107.141678,27.944354', altitude: 868},
+    {name: '绥阳停车区(绥遵高速遵义方向)', location: '107.140308,27.943430', altitude: 868},
+  ],
+  "赤水市": [
+    {name: '旺隆服务区(蓉遵高速成都方向)', location: '105.877444,28.523197', altitude: 377},
+    {name: '旺隆服务区(蓉遵高速遵义方向)', location: '105.873800,28.524998', altitude: 377},
+    {name: '天台停车区(蓉遵高速遵义方向)', location: '105.766214,28.559046', altitude: 307},
+  ],
+  "道真仡佬族苗族自治县": [
+    {name: '道真服务区(银百高速银川方向)', location: '107.512847,28.858782', altitude: 851},
+    {name: '道真服务区(银百高速百色方向)', location: '107.513021,28.857318', altitude: 851},
+  ]
+}
+
 const ServiceStops: {[city: string]: DistrictArea} = {
   "广州市": GuangZhouServiceStops,
   "佛山市": FoShanServiceStops,
@@ -1426,4 +1569,5 @@ const ServiceStops: {[city: string]: DistrictArea} = {
   "六盘水市": LiuPanShuiServiceStops,
   "安顺市": AnShunServiceStops,
   "黔西南布依族苗族自治州": QianXiNanServiceStops,
+  "遵义市": ZunYiServiceStops,
 }
