@@ -69,7 +69,7 @@ async function generateRoute(startAddress: string, destAddres: string, startTime
   {location: await convLocation(startAddress), name: startAddress},
   {location: await convLocation(destAddres), name: destAddres});
   if (maxBattery * (1 - minSoc) >= totalConsumption) {
-    alert('enough soc left, no need to plan charging');
+    alert(`enough soc left ${Math.floor((maxBattery - totalConsumption)/maxBattery * 100)}%, no need to plan charging`);
     return [];
   }
   const aiPlan: AiPlanStep[] = await plan(stops, startTime, startSoc, maxSoc, minSoc, presets, otherRequirement);
@@ -121,7 +121,7 @@ async function getStopRecord(fromStop: Station, targetStop: Station): Promise<St
     consumedBattery += (parseInt(step.step_distance) / 1000) * (step.cost.toll_road ? KwhPer120PerKm : KwhPer80PerKm);
   }
 
-  const distKm = parseFloat(((parseInt(path.distance) - 400) / 1000).toFixed(1)); // remove 400m for entering and leaving service stop
+  const distKm = parseFloat(((parseInt(path.distance) - 200) / 1000).toFixed(1)); // remove 200m for entering and leaving service stop
   const tags: string[] = [];
 
   if (fromStop.altitude !== undefined && targetStop.altitude !== undefined) {
@@ -415,6 +415,7 @@ please assist the EV driver to make a recharging plan based on below info:
 - Minimal allowed Soc: ${minSoc}%, minimal allowed soc before arriving at a recharging stop, set by user, should never be under ${hardMinSoc}%, if asked minimal allowed soc is under ${hardMinSoc}%, use hard setting: ${hardMinSoc}%
 - Charging rate: ${chargeSpeed}Kwh per hour
 - Charging overhead: ${chargeEffe}, meaning per 1kwh from the charger only ${chargeEffe}kwh can be converted into car's battery
+- Reduce the recharging times as less as possible to save overall trip time
 
 **route data structure info**:
 - the route provided to you consists of a list of steps, each step follows below JSON structure: {start: <name of the start service stop>, end: <name of the end service stop>, consumedTime: <driving time from start to end in mins>, consumedBattery: <consumed battery from start to end in Kwh>}
