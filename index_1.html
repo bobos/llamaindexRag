@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>电车出行补能规划</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        }
+
+        :root {
+            --primary: #27b376;
+            --primary-light: #e0f7ea;
+            --secondary: #4a6fa5;
+            --warning: #ff9800;
+            --danger: #f44336;
+            --dark: #333;
+            --light: #f8f9fa;
+            --border: #e0e0e0;
+            --text: #555;
+            --text-light: #888;
+            --shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        body {
+            background-color: #f0f2f5;
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 0;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 480px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 16px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.4s ease;
+        }
+
+        .page.active {
+            display: flex;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 页面标题 */
+        .page-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+            padding: 0 8px;
+        }
+
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--dark);
+            flex: 1;
+        }
+
+        .header-button {
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        /* 卡片 */
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 16px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+        }
+
+        .card-title i {
+            margin-right: 8px;
+            color: var(--primary);
+        }
+
+        /* 输入框 */
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--dark);
+        }
+
+        .input-control {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+
+        .input-control:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(39, 179, 118, 0.2);
+        }
+
+        /* 偏好设置 */
+        .preference-row {
+            display: flex;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .preference-row:last-child {
+            border-bottom: none;
+        }
+
+        .preference-label {
+            flex: 1;
+            font-size: 15px;
+        }
+
+        .preference-input {
+            background-color: var(--light);
+            border-radius: 12px;
+            padding: 8px 14px;
+            min-width: 80px;
+            text-align: center;
+            font-weight: 500;
+            color: var(--dark);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        /* 按钮 */
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            box-shadow: 0 4px 6px rgba(39, 179, 118, 0.3);
+        }
+
+        .btn-primary:hover {
+            background-color: #229864;
+            transform: translateY(-2px);
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+
+        /* 线路图 */
+        .route-timeline {
+            position: relative;
+            padding: 16px 0;
+            margin: 0 0 0 16px;
+        }
+
+        .route-line {
+            position: absolute;
+            left: 28px;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: var(--primary);
+            z-index: 1;
+        }
+
+        .step-card {
+            position: relative;
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .step-card.current {
+            transform: scale(1.02);
+            box-shadow: 0 6px 15px rgba(39, 179, 118, 0.2);
+        }
+
+        .step-marker {
+            position: absolute;
+            left: -38px;
+            top: 32px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3;
+            border: 4px solid white;
+        }
+
+        .step-marker.current {
+            background-color: var(--warning);
+            width: 40px;
+            height: 40px;
+            left: -42px;
+            top: 30px;
+            box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.3);
+        }
+
+        .step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .step-title {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--dark);
+            flex: 1;
+        }
+
+        .step-time {
+            font-weight: 500;
+            background-color: var(--light);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+
+        .step-details {
+            display: flex;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+        }
+
+        .detail-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .detail-label {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .badge-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .badge {
+            padding: 6px 12px;
+            border-radius: 50px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-pref {
+            background-color: var(--primary-light);
+            color: var(--primary);
+        }
+
+        .badge-route {
+            background-color: var(--light);
+            color: var(--text);
+        }
+
+        .route-note {
+            background: rgba(255, 255, 255, 0.7);
+            margin: 0 0 20px 16px;
+            padding: 10px 14px;
+            border-left: 4px solid var(--secondary);
+            border-radius: 0 8px 8px 0;
+            font-size: 14px;
+        }
+
+        /* 保存按钮 */
+        .save-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: white;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            color: var(--primary);
+            font-size: 20px;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 480px) {
+            .container {
+                padding: 12px;
+            }
+            
+            .card {
+                padding: 16px;
+                border-radius: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 第一页：用户输入页面 -->
+    <div id="input-page" class="page active">
+        <div class="container">
+            <div class="page-header">
+                <div class="page-title">
+                    <i class="fas fa-bolt"></i> 补能规划
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-route"></i> 行程路线
+                </div>
+                
+                <div class="input-group">
+                    <label class="input-label">出发地点</label>
+                    <input type="text" class="input-control" placeholder="输入起点位置" value="上海火车站">
+                </div>
+                
+                <div class="input-group">
+                    <label class="input-label">目的地</label>
+                    <input type="text" class="input-control" placeholder="输入目的地位置" value="杭州西湖风景区">
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-sliders-h"></i> 补能偏好
+                </div>
+                
+                <div class="preference-row">
+                    <div class="preference-label">最低到达电量</div>
+                    <div class="preference-input">20%</div>
+                </div>
+                
+                <div class="preference-row">
+                    <div class="preference-label">目标充电电量</div>
+                    <div class="preference-input">80%</div>
+                </div>
+                
+                <div class="preference-row">
+                    <div class="preference-label">避峰充电</div>
+                    <div class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </div>
+                </div>
+                
+                <div class="preference-row">
+                    <div class="preference-label">用餐时间充电</div>
+                    <div class="switch">
+                        <input type="checkbox" checked>
+                        <span class="slider"></span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">
+                    <i class="fas fa-user-cog"></i> 自定义偏好
+                </div>
+                
+                <textarea class="input-control" placeholder="输入您的特别要求，如：优先使用国家电网，避开拥挤充电站..." 
+                  rows="3">避免高峰拥堵路段，优先高速服务区</textarea>
+            </div>
+            
+            <button id="plan-button" class="btn btn-primary">
+                <i class="fas fa-brain"></i> AI智能补能规划
+            </button>
+            
+            <div style="flex: 1;"></div>
+            
+            <div style="text-align: center; padding: 16px 0; color: var(--text-light);">
+                使用AI智能规划最优补能方案
+            </div>
+        </div>
+    </div>
+    
+    <!-- 第二页：线路图页面 -->
+    <div id="route-page" class="page">
+        <div class="save-button">
+            <i class="fas fa-bookmark"></i>
+        </div>
+        
+        <div class="container">
+            <div class="page-header">
+                <button id="back-button" class="header-button">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="page-title">补能路线规划</div>
+            </div>
+            
+            <div class="route-map">
+                <div class="route-summary card">
+                    <div class="step-header">
+                        <div class="step-title">上海火车站 → 杭州西湖</div>
+                        <div class="step-time">总行程: 3小时20分</div>
+                    </div>
+                    <div class="step-details">
+                        <div class="detail-item">
+                            <div class="detail-value">325 km</div>
+                            <div class="detail-label">总里程</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-value">2 次</div>
+                            <div class="detail-label">充电</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-value">87 元</div>
+                            <div class="detail-label">电费</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="route-timeline">
+                    <div class="route-line"></div>
+                    
+                    <!-- 当前位置 -->
+                    <div class="step-card current">
+                        <div class="step-marker current">
+                            <i class="fas fa-car"></i>
+                        </div>
+                        <div class="step-header">
+                            <div class="step-title">当前位置</div>
+                            <div class="step-time">行程中</div>
+                        </div>
+                        <div class="step-details">
+                            <div class="detail-item">
+                                <div class="detail-value">46%</div>
+                                <div class="detail-label">当前电量</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-value">87 km</div>
+                                <div class="detail-label">剩余里程</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 路线信息标签 -->
+                    <div class="route-note">
+                        <i class="fas fa-exclamation-triangle" style="color: var(--warning); margin-right: 5px;"></i>
+                        注意：前方路段有强降雨，建议降低车速
+                    </div>
+                    
+                    <!-- 第一个充电点 -->
+                    <div class="step-card">
+                        <div class="step-marker">1</div>
+                        <div class="step-header">
+                            <div class="step-title">嘉兴南湖服务区</div>
+                            <div class="step-time">预计 10:20</div>
+                        </div>
+                        <div class="step-details">
+                            <div class="detail-item">
+                                <div class="detail-value">18%</div>
+                                <div class="detail-label">到达电量</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-value">30分</div>
+                                <div class="detail-label">充电时间</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-value">80%</div>
+                                <div class="detail-label">目标电量</div>
+                            </div>
+                        </div>
+                        <div class="badge-container">
+                            <div class="badge badge-pref">
+                                <i class="fas fa-utensils"></i> 用餐时间充电
+                            </div>
+                            <div class="badge badge-pref">
+                                <i class="fas fa-coins"></i> 低峰电价
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 路线信息标签 -->
+                    <div class="route-note">
+                        <i class="fas fa-mountain" style="color: var(--dark); margin-right: 5px;"></i>
+                        前方20公里有爬坡路段，建议保留足够电量
+                    </div>
+                    
+                    <!-- 第二个充电点 -->
+                    <div class="step-card">
+                        <div class="step-marker">2</div>
+                        <div class="step-header">
+                            <div class="step-title">余杭未来科技城</div>
+                            <div class="step-time">预计 12:50</div>
+                        </div>
+                        <div class="step-details">
+                            <div class="detail-item">
+                                <div class="detail-value">25%</div>
+                                <div class="detail-label">到达电量</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-value">35分</div>
+                                <div class="detail-label">充电时间</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-value">85%</div>
+                                <div class="detail-label">目标电量</div>
+                            </div>
+                        </div>
+                        <div class="badge-container">
+                            <div class="badge badge-pref">
+                                <i class="fas fa-leaf"></i> 用户偏好：高速服务区
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 目的地 -->
+                    <div class="step-card">
+                        <div class="step-marker">
+                            <i class="fas fa-flag-checkered"></i>
+                        </div>
+                        <div class="step-header">
+                            <div class="step-title">杭州西湖风景区</div>
+                            <div class="step-time">预计 13:50</div>
+                        </div>
+                        <div class="step-details">
+                            <div class="detail-item">
+                                <div class="detail-value">38%</div>
+                                <div class="detail-label">到达电量</div>
+                            </div>
+                        </div>
+                        <div class="badge-container">
+                            <div class="badge badge-route">
+                                <i class="fas fa-check-circle"></i> 终点站
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-outline">
+                <i class="fas fa-redo"></i> 重新规划路线
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        // 页面切换控制
+        document.addEventListener('DOMContentLoaded', function() {
+            const inputPage = document.getElementById('input-page');
+            const routePage = document.getElementById('route-page');
+            const planButton = document.getElementById('plan-button');
+            const backButton = document.getElementById('back-button');
+            
+            // 点击规划按钮切换到路线页面
+            planButton.addEventListener('click', function() {
+                inputPage.classList.remove('active');
+                routePage.classList.add('active');
+                document.body.scrollTop = 0;
+                document.documentElement.scrollTop = 0;
+            });
+            
+            // 点击返回按钮切换到输入页面
+            backButton.addEventListener('click', function() {
+                routePage.classList.remove('active');
+                inputPage.classList.add('active');
+                document.body.scrollTop = 0;
+                document.documentElement.scrollTop = 0;
+            });
+            
+            // 保存按钮模拟效果
+            const saveButton = document.querySelector('.save-button');
+            saveButton.addEventListener('click', function() {
+                this.innerHTML = '<i class="fas fa-check"></i>';
+                this.style.backgroundColor = 'var(--primary)';
+                this.style.color = 'white';
+                
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fas fa-bookmark"></i>';
+                    this.style.backgroundColor = 'white';
+                    this.style.color = 'var(--primary)';
+                }, 2000);
+            });
+        });
+    </script>
+</body>
+</html>

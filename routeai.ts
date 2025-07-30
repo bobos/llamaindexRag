@@ -121,7 +121,7 @@ async function getStopRecord(fromStop: Station, targetStop: Station): Promise<St
     consumedBattery += (parseInt(step.step_distance) / 1000) * (step.cost.toll_road ? KwhPer120PerKm : KwhPer80PerKm);
   }
 
-  const distKm = parseFloat(((parseInt(path.distance) - 200) / 1000).toFixed(1)); // remove 200m for entering and leaving service stop
+  const distKm = parseFloat((parseInt(path.distance) / 1000).toFixed(1));
   const tags: string[] = [];
 
   if (fromStop.altitude !== undefined && targetStop.altitude !== undefined) {
@@ -147,11 +147,19 @@ async function getStopRecord(fromStop: Station, targetStop: Station): Promise<St
 }
 
 async function getPath(originLoc: string, destLoc: string): Promise<Path> {
-  const response = await request(`/v5/direction/driving?origin=${originLoc}&destination=${destLoc}&strategy=2&cartype=1&show_fields=cost,polyline,cities`);
+  const response = await request(`/v5/direction/driving?origin=${originLoc}&destination=${destLoc}&strategy=32&cartype=1&show_fields=cost,polyline,cities`);
   if (!response) {
     throw new Error(`failed to path from ${originLoc} to ${destLoc}`);
   }
-  return response.route.paths[0];
+  let path = response.route.paths[0];
+  let duration = parseInt(path.cost.duration);
+  for (const p of response.route.paths) {
+    let d = parseInt(p.cost.duration);
+    if (d < duration) {
+      path = p;
+    }
+  }
+  return path;
 }
 
 async function convLocation(address: string): Promise<string> {
@@ -168,6 +176,7 @@ const chatModelDsV3 = 'deepseek-ai/DeepSeek-V3';
 const chatModelO4Mini ='openai/o4-mini';
 const chatModelO4MiniHigh ='openai/o4-mini-high';
 const chatModelGrok4 ='x-ai/grok-4';
+const chatModelGlm ='z-ai/glm-4.5';
 const openrouterKey = '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';
 const openrouterHost = 'https://openrouter.ai/api/v1/chat/completions'; 
 const siliconflowKey = 'sk-ldrpfdlimnrwcrgmkdemwqkphisowucfzpvqbmakltjmgnsb';
@@ -288,7 +297,7 @@ function calculateConsumptionAndTime(from: string, to: string, stops: Stop[]): n
   let kwh = 0;
   let found = false;
   for (const stop of stops) {
-    if (stop.start === from) {
+    if (stop.start === from || from === stop.start.split('(')[0]) {
       found = true;
     }
 
@@ -297,7 +306,7 @@ function calculateConsumptionAndTime(from: string, to: string, stops: Stop[]): n
       kwh += stop.consumedBattery;
     }
 
-    if (stop.end === to) {
+    if (stop.end === to || to === stop.end.split('(')[0]) {
       if (!found) break;
       else return [kwh, time];
     }
@@ -518,7 +527,7 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
       content: 'You are a helpful assistant for to help user make all kinds of accurate and efficient plans, when you are crunching numbers, double check the correctness of your calculation.'
     },
     {
-      content: prompt,
+      content: promptForDsR1,
       role: 'user'
     }];
   }
@@ -526,7 +535,7 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
   const answer: string = await askLlm(
     openrouterHost,
     openrouterKey,
-    chatModelO4Mini,
+    chatModelGlm,
     messages,
     response_format);
 
@@ -563,7 +572,10 @@ async function askLlm(host: string, key: string, model: string, messages: any[],
     model,
     messages,
     //tools,
-    stream: false
+    stream: false,
+    reasoning: {
+      enabled: true
+    }
   }
   if (response_format !== undefined) {
     body.response_format = response_format;
@@ -606,11 +618,11 @@ function functionCalls(tool_calls: {function: {arguments: string, name: string},
 }
 
 generateRoute(
-  '贵州省贵阳市开阳县双流镇中学',
   '广州市黄埔区中新知识城招商雍景湾',
+  '广西壮族自治区柳州市三江侗族自治县浔江大道59',
   '6:30', 100, 90, 10,
   [Preset.conservative],
-  '优先安排在早餐和午餐时段充电,午餐时段充电充满到100%,尽量避免11:00 - 13:00高电价区间充电,保抵达终点时有至少15%的电').then(ret => console.log(ret));
+  '优先安排早餐时段充电,尽量避免11:00 - 13:00高电价区间充电,保证抵达终点时有至少15%的电').then(ret => console.log(ret));
 
 async function r(city: string, pageNum: number): Promise<any> {
   const reqUrl = `https://restapi.amap.com/v5/place/text?types=180300&key=d0e0aab6356af92b0cd0763cae27ba35&output=json&region=${city}&page_size=25&page_num=${pageNum}`;
@@ -1694,11 +1706,69 @@ const QianNanServiceStops: DistrictArea = {
   ]
 }
 
+const WuZhouServiceStops: DistrictArea = {
+  万秀区:[
+    {name: '夏郢服务区(梧州绕城高速外环方向)', location: '111.299986,23.564502', altitude: 39},
+    {name: '夏郢服务区(梧州绕城高速内环方向)', location: '111.300114,23.563003', altitude: 39},
+  ],
+  岑溪市: [
+    {name: '筋竹服务区(深岑高速深圳方向)', location: '111.229024,22.895104', altitude: 167},
+    {name: '筋竹服务区(深岑高速岑溪方向)', location: '111.234551,22.895704', altitude: 167},
+    {name: '岑溪东服务区(深岑高速岑溪方向)', location: '111.054616,22.886235', altitude: 141},
+    {name: '岑溪东服务区(深岑高速深圳方向)', location: '111.068731,22.887360', altitude: 141},
+    {name: '中林停车区(广昆高速广州方向)', location: '110.864788,22.904746', altitude: 102},
+    {name: '中林停车区(广昆高速昆明方向)', location: '110.865233,22.905307', altitude: 102},
+    {name: '大隆服务区(包茂高速茂名方向)', location: '111.011956,22.759163', altitude: 270},
+    {name: '大隆服务区(包茂高速包头方向)', location: '111.010949,22.757002', altitude: 270},
+    {name: '岑溪服务区(包茂高速包头方向)', location: '111.042896,23.007335', altitude: 138},
+    {name: '岑溪服务区(包茂高速茂名方向)', location: '111.041976,23.008244', altitude: 138},
+    {name: '三堡服务区(平岑高速平南方向)', location: '110.962600,23.037400', altitude: 116},
+    {name: '三堡服务区(平岑高速岑溪方向)', location: '110.962931,23.035250', altitude: 116},
+  ],
+  苍梧县: [
+    {name: '岭脚服务区(梧柳高速柳州方向)', location: '111.020077,23.552382', altitude: 86},
+    {name: '岭脚服务区(梧柳高速梧州方向)', location: '111.018731,23.551360', altitude: 86},
+    {name: '苍梧服务区(信梧高速信都方向)', location: '111.518444,23.757871', altitude: 73},
+    {name: '苍梧服务区(信梧高速梧州方向)', location: '111.518967,23.759513', altitude: 73},
+    {name: '狮寨停车区(包茂高速茂名方向)', location: '111.127296,23.779487', altitude: 67},
+    {name: '狮寨停车区(包茂高速包头方向)', location: '111.129402,23.783659', altitude: 67},
+  ],
+  蒙山县: [
+    {name: '新圩服务区(贺西高速西林方向)', location: '110.411040,24.305982', altitude: 279},
+    {name: '新圩服务区(贺西高速贺州方向)', location: '110.407716,24.304482', altitude: 279},
+  ],
+  藤县: [
+    {name: '藤县服务区(梧硕高速硕龙方向)', location: '110.949221,23.317129', altitude: 57},
+    {name: '藤县服务区(梧硕高速苍梧方向)', location: '110.953229,23.317185', altitude: 57},
+    {name: '和平服务区(梧柳高速梧州方向)', location: '110.677682,23.590213', altitude: 92},
+    {name: '和平服务区(梧柳高速柳州方向)', location: '110.678795,23.591699', altitude: 92},
+    {name: '宁康服务区(呼北高速北海方向)', location: '110.408315,23.891465', altitude: 142},
+    {name: '宁康服务区(呼北高速呼和浩特方向)', location: '110.410198,23.889141', altitude: 142},
+    {name: '新庆服务区(梧硕高速硕龙方向)', location: '110.687827,23.289392', altitude: 96},
+    {name: '新庆服务区(梧硕高速梧州方向)', location: '110.686868,23.288998', altitude: 96},
+    {name: '藤县西服务区(平岑高速平南方向)', location: '110.827854,23.333558', altitude: 140},
+    {name: '藤县西服务区(平岑高速岑溪方向)', location: '110.825828,23.332932', altitude: 140},
+  ],
+  长洲区: [
+    {name: '倒水服务区(包茂高速茂名方向)', location: '111.136787,23.585381', altitude: 32},
+    {name: '倒水服务区(包茂高速包头方向)', location: '111.138188,23.584943', altitude: 32},
+  ],
+  龙圩区: [
+    {name: '大坡服务区(广昆高速昆明方向)', location: '111.311046,23.321217', altitude: 43},
+    {name: '大坡服务区(广昆高速广州方向)', location: '111.310045,23.320686', altitude: 43},
+    {name: '新地服务区(包茂高速茂名方向)', location: '111.173406,23.204952', altitude: 109},
+    {name: '新地服务区(包茂高速包头方向)', location: '111.174553,23.203179', altitude: 109},
+    {name: '白沙停车区(包茂高速茂名方向)', location: '111.185456,23.409642', altitude: 23},
+    {name: '白沙停车区(包茂高速包头方向)', location: '111.186723,23.408933', altitude: 23},
+  ]
+}
+
 const ServiceStops: {[city: string]: DistrictArea} = {
   "广州市": GuangZhouServiceStops,
   "佛山市": FoShanServiceStops,
   "肇庆市": ZhaoQingServiceStops,
   "贺州市": HeZhouServiceStops,
+  "梧州市": WuZhouServiceStops,
   "桂林市": GuiLinServiceStops,
   "柳州市": LiuZhouServiceStops,
   "黔东南苗族侗族自治州":QianDongNanServiceStops,
