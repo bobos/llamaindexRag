@@ -532,14 +532,24 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
     }];
   }
 
-  const answer: string = await askLlm(
+  let answer: string = await askLlm(
     openrouterHost,
     openrouterKey,
     chatModelGlm,
     messages,
     response_format);
 
-  const ret: any = JSON.parse(answer);
+  if (answer.startsWith('```json')) {
+    const regex = /```json\s([\s\S]*?)```/s;
+    const body = answer.match(regex);
+    if (body) {
+      answer = body[1];
+    } else {
+      throw new Error('malformed answer: ' + answer);
+    }
+  }
+
+  const ret: any = JSON.parse(answer.trim());
   if (ret.reason) {
     alert(ret.reason);
   }
@@ -620,7 +630,7 @@ function functionCalls(tool_calls: {function: {arguments: string, name: string},
 generateRoute(
   '广州市黄埔区中新知识城招商雍景湾',
   '广西壮族自治区柳州市三江侗族自治县浔江大道59',
-  '6:30', 100, 90, 10,
+  '6:30', 100, 85, 10,
   [Preset.conservative],
   '优先安排早餐时段充电,尽量避免11:00 - 13:00高电价区间充电,保证抵达终点时有至少15%的电').then(ret => console.log(ret));
 
