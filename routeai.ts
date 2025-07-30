@@ -7,6 +7,13 @@ const J2KwhFactor = 3.6e6;
 const maxBattery = 61;
 const hardMinSoc = 5;
 
+function print(line: string): void {
+  const parent:any = document.getElementById('loading-page');
+  const lineDiv = document.createElement('div');
+  lineDiv.innerHTML = line;
+  parent.appendChild(lineDiv);
+}
+
 interface Step {
   step_distance: string;
   road_name: string;
@@ -64,7 +71,11 @@ function getGravityEnergyKwh(distance: number, weight: number, altitudeDiff: num
   return altitudeDiff >=0 ? slopeEnergy : slopeEnergy * eta;
 }
 
-async function generateRoute(startAddress: string, destAddres: string, startTime: string, startSoc: number, maxSoc: number, minSoc: number, presets: Preset[], otherRequirement: string): Promise<AiPlanStep[]> {
+let chatModel = '';
+let apiKey = '';
+async function generateRoute(key: string, model: string, startAddress: string, destAddres: string, startTime: string, startSoc: number, maxSoc: number, minSoc: number, presets: Preset[], otherRequirement: string): Promise<AiPlanStep[]> {
+  chatModel = models[model];
+  apiKey = key;
   const {stops, totalConsumption, totalDistance} = await collectStops(
   {location: await convLocation(startAddress), name: startAddress},
   {location: await convLocation(destAddres), name: destAddres});
@@ -98,7 +109,7 @@ async function collectStops(startStation: Station, endStation: Station): Promise
         totalConsumption += nextStop.consumedBattery;
         totalDistance += nextStop.distance;
         prevStation = ret;
-        console.log(nextStop, totalDistance);
+        print(`${JSON.stringify(nextStop)} ${totalDistance}`);
       }
     }
   }
@@ -108,7 +119,7 @@ async function collectStops(startStation: Station, endStation: Station): Promise
     stops.push(nextStop);
     totalConsumption += nextStop.consumedBattery;
     totalDistance += nextStop.distance;
-    console.log(nextStop, totalDistance);
+    print(`${JSON.stringify(nextStop)} ${totalDistance}`);
   }
 
   return {stops, totalConsumption, totalDistance};
@@ -171,16 +182,14 @@ async function convLocation(address: string): Promise<string> {
 }
 
 //const chatModelDsR1 ='Pro/deepseek-ai/DeepSeek-R1';
-const chatModelDsR1 ='deepseek/deepseek-r1-0528';
-const chatModelDsV3 = 'deepseek-ai/DeepSeek-V3';
-const chatModelO4Mini ='openai/o4-mini';
-const chatModelO4MiniHigh ='openai/o4-mini-high';
-const chatModelGrok4 ='x-ai/grok-4';
-const chatModelGlm ='z-ai/glm-4.5';
-const openrouterKey = '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';
+const models: any = {
+  deepseekr1: 'deepseek/deepseek-r1-0528',
+  deepseekv3: 'deepseek-ai/DeepSeek-V3',
+  o4mini:'openai/o4-mini',
+  glm: 'z-ai/glm-4.5',
+}
+
 const openrouterHost = 'https://openrouter.ai/api/v1/chat/completions'; 
-const siliconflowKey = 'sk-ldrpfdlimnrwcrgmkdemwqkphisowucfzpvqbmakltjmgnsb';
-const siliconflowHost = 'https://api.siliconflow.cn/v1/chat/completions';
 
 const tools = [{
   type: 'function',
@@ -313,7 +322,6 @@ function calculateConsumptionAndTime(from: string, to: string, stops: Stop[]): n
   }
 
   const err = `从${from}到${to}的旅程没找到`;
-  alert(err);
   throw new Error(err);
 }
 
@@ -331,7 +339,7 @@ function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): strin
 
     if (leftKwh < minKwh) {
       const err = `The hard minimal allowed Soc is ${hardMinSoc}%, but according to your plan, the remaining Soc from ${step.fromStop} to ${step.arrivalStop} will be under ${hardMinSoc}%`;
-      console.log(err);
+      print(err);
       return err;
     }
 
@@ -345,7 +353,7 @@ function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): strin
         if (step.backupStop === stop.start) {
           if (arrivalFound) break;
           const err = `The backup service stop should be after the arrival stop, but according to your plan, backup stop ${step.backupStop} is before arrival stop ${step.arrivalStop}`;
-          console.log(err);
+          print(err);
           return err;
         }
       }
@@ -355,7 +363,7 @@ function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): strin
 
       if (tempLeftKwh < minKwh) {
         const err = `The hard minimal allowed Soc is ${hardMinSoc}%, but according to your plan, the remaining Soc from ${step.fromStop} to backup stop ${step.backupStop} will be under ${hardMinSoc}%`;
-        console.log(err);
+        print(err);
         return err;
       }
     }
@@ -364,7 +372,7 @@ function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): strin
     deviation = Math.abs(aiGuessArrival - totalTime); 
     if (deviation > 2) {
       const err = `Comparing to the actually calculated result, there is ${deviation} minutes deviation on arrival time from ${step.fromStop} to ${step.arrivalStop} according to your plan`;
-      console.log(err);
+      print(err);
       return err;
     }
 
@@ -372,7 +380,7 @@ function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): strin
     deviation = Math.abs(aiGuessKwh - Math.floor(leftKwh));
     if (deviation > 1) {
       const err = `Comparing to the actually calculated result, there is ${deviation} Kwh deviation on left battery when arrival at ${step.arrivalStop} according to your plan`;
-      console.log(err);
+      print(err);
       return err;
     }
 
@@ -382,7 +390,7 @@ function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): strin
     deviation = Math.abs(step.rechargeTime - chargeTime);
     if (deviation > 2) {
       const err = `Comparing to the actually calculated result, there is ${deviation} minutes deviation on recharging time when recharging at ${step.arrivalStop} according to your plan`;
-      console.log(err);
+      print(err);
       return err;
     }
 
@@ -391,7 +399,7 @@ function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): strin
     deviation = Math.abs(aiGuessTime - totalTime);
     if (deviation > 2) {
       const err = `Comparing to the actually calculated result, there is ${deviation} minutes deviation on departure time when departing ${step.arrivalStop} according to your plan`;
-      console.log(err);
+      print(err);
       return err;
     }
     totalTime = aiGuessTime;
@@ -406,7 +414,7 @@ function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): strin
     leftKwh -= kwh;
     if (leftKwh < minKwh) {
       const err = `The hard minimal allowed Soc is ${hardMinSoc}%, but according to your plan, the remaining Soc from ${lastPlannedStop} to ${lastStop} will be under ${hardMinSoc}%`;
-      console.log(err);
+      print(err);
       return err;
     }
     plan.push({fromStop: lastPlannedStop, arrivalStop: lastStop, backupStop: 'No', arrivalTime: `${last.departureTime} + ${time}分`, departureTime: '', socBeforeRecharge: Math.floor(leftKwh / maxBattery * 100), rechargeTime: 0, socAfterRecharge: -1, tags: ['到达目的地']})
@@ -536,8 +544,8 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
 
   let answer: string = await askLlm(
     openrouterHost,
-    openrouterKey,
-    chatModelGlm,
+    apiKey,
+    chatModel,
     messages,
     response_format);
 
@@ -552,11 +560,8 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
   }
 
   const ret: any = JSON.parse(answer.trim());
-  if (ret.reason) {
-    alert(ret.reason);
-  }
   if (!ret.rechargingPlan || ret.rechargingPlan.length === 0) {
-    throw new Error('no plan provided');
+    throw new Error('no plan provided: ' + ret.reason);
   }
 
   const aiPlan = ret.rechargingPlan as AiPlanStep[];
@@ -579,7 +584,7 @@ ${JSON.stringify(stops.map(({start, end, consumedTime, consumedBattery}: Stop) =
 
 let callCnt = 0;
 async function askLlm(host: string, key: string, model: string, messages: any[], response_format?: any): Promise<string> {
-  console.log('LLM call', messages);
+  print('call LLM');
   const body: any = {
     model,
     messages,
@@ -612,7 +617,7 @@ async function askLlm(host: string, key: string, model: string, messages: any[],
     callCnt++;
     return await askLlm(host, key, model, messages.concat(functionCalls(response.tool_calls)), response_format);
   }
-  console.log('LLM answer', response.content);
+  print('LLM answer:' + response.content);
   return response.content.trim();
 }
 
@@ -629,17 +634,9 @@ function functionCalls(tool_calls: {function: {arguments: string, name: string},
   return messages;
 }
 
-generateRoute(
-  '广州市黄埔区中新知识城招商雍景湾',
-  '广西壮族自治区柳州市三江侗族自治县浔江大道59',
-  '6:30', 100, 85, 13,
-  [Preset.conservative],
-  '优先安排早餐时段充电,尽量避免11:00 - 13:00高电价区间充电,保证抵达终点时有至少15%的电').then(ret => console.log(ret));
-
 async function r(city: string, pageNum: number): Promise<any> {
   const reqUrl = `https://restapi.amap.com/v5/place/text?types=180300&key=d0e0aab6356af92b0cd0763cae27ba35&output=json&region=${city}&page_size=25&page_num=${pageNum}`;
   let response: any = await fetch(reqUrl);
-  console.log(reqUrl);
 
   if (!response.ok) throw new Error(`network response was not ok ${response.statusText}`);
 
