@@ -4,7 +4,7 @@ const Weight = 2.1;
 const chargeEffe = 0.92;
 const chargeSpeed = 70;
 const J2KwhFactor = 3.6e6;
-const maxBattery = 59.5;
+const maxBattery = 61;
 const hardMinSoc = 5;
 
 interface Step {
@@ -398,16 +398,18 @@ function verifyPlan(plan: AiPlanStep[], stops: Stop[], startTime: string): strin
     leftKwh = parseFloat((step.socAfterRecharge * 0.01 * maxBattery).toFixed(2));
   }
 
-  const lastPlannedStop = plan[plan.length -1].arrivalStop;
+  const last = plan[plan.length -1];
+  const lastPlannedStop = last.arrivalStop;
   const lastStop = stops[stops.length -1].end;
-  if (lastStop !== lastPlannedStop) {
-    const [kwh, _time] = calculateConsumptionAndTime(lastPlannedStop, lastStop, stops);
+  if (lastStop !== lastPlannedStop && lastPlannedStop !== lastStop.split('(')[0]) {
+    const [kwh, time] = calculateConsumptionAndTime(lastPlannedStop, lastStop, stops);
     leftKwh -= kwh;
     if (leftKwh < minKwh) {
       const err = `The hard minimal allowed Soc is ${hardMinSoc}%, but according to your plan, the remaining Soc from ${lastPlannedStop} to ${lastStop} will be under ${hardMinSoc}%`;
       console.log(err);
       return err;
     }
+    plan.push({fromStop: lastPlannedStop, arrivalStop: lastStop, backupStop: 'No', arrivalTime: `${last.departureTime} + ${time}分`, departureTime: '', socBeforeRecharge: Math.floor(leftKwh / maxBattery * 100), rechargeTime: 0, socAfterRecharge: -1, tags: ['到达目的地']})
   }
 
   return '';
@@ -630,7 +632,7 @@ function functionCalls(tool_calls: {function: {arguments: string, name: string},
 generateRoute(
   '广州市黄埔区中新知识城招商雍景湾',
   '广西壮族自治区柳州市三江侗族自治县浔江大道59',
-  '6:30', 100, 85, 10,
+  '6:30', 100, 85, 13,
   [Preset.conservative],
   '优先安排早餐时段充电,尽量避免11:00 - 13:00高电价区间充电,保证抵达终点时有至少15%的电').then(ret => console.log(ret));
 
