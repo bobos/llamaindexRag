@@ -427,12 +427,22 @@
                 
                 <div class="input-group">
                     <label class="input-label">出发地点</label>
-                    <input type="text" class="input-control" placeholder="输入起点位置" value="上海火车站">
+                    <input type="text" class="input-control" id="startPoint" placeholder="输入起点位置" value="广州市黄埔区中新知识城招商雍景湾">
                 </div>
                 
                 <div class="input-group">
                     <label class="input-label">目的地</label>
-                    <input type="text" class="input-control" placeholder="输入目的地位置" value="杭州西湖风景区">
+                    <input type="text" class="input-control" id="stopPoint" placeholder="输入目的地位置" value="广西壮族自治区柳州市三江侗族自治县浔江大道59">
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">出发时间</label>
+                    <input type="text" class="input-control" id="startTime" placeholder="输入出发时间" value="6:30">
+                </div>
+
+                <div class="input-group">
+                    <label class="input-label">出发电量</label>
+                    <input type="text" class="input-control" id="startSoc" placeholder="输入出发电量" value="100">
                 </div>
             </div>
             
@@ -441,28 +451,20 @@
                     <i class="fas fa-sliders-h"></i> 补能偏好
                 </div>
                 
-                <div class="preference-row">
-                    <div class="preference-label">最低到达电量</div>
-                    <div class="preference-input">20%</div>
+                <div class="input-group">
+                    <label class="input-label">保电目标</label>
+                    <input type="text" class="input-control" id="minSoc" value="13">
+                </div>
+                
+                <div class="input-group">
+                    <label class="input-label">充电目标</label>
+                    <input type="text" class="input-control" id="maxSoc" value="85">
                 </div>
                 
                 <div class="preference-row">
-                    <div class="preference-label">目标充电电量</div>
-                    <div class="preference-input">80%</div>
-                </div>
-                
-                <div class="preference-row">
-                    <div class="preference-label">避峰充电</div>
+                    <div class="preference-label">保守规划</div>
                     <div class="switch">
-                        <input type="checkbox" checked>
-                        <span class="slider"></span>
-                    </div>
-                </div>
-                
-                <div class="preference-row">
-                    <div class="preference-label">用餐时间充电</div>
-                    <div class="switch">
-                        <input type="checkbox" checked>
+                        <input id="strategy" type="checkbox" checked>
                         <span class="slider"></span>
                     </div>
                 </div>
@@ -474,7 +476,7 @@
                 </div>
                 
                 <textarea class="input-control" placeholder="输入您的特别要求，如：优先使用国家电网，避开拥挤充电站..." 
-                  rows="3">避免高峰拥堵路段，优先高速服务区</textarea>
+                  rows="3">优先安排早餐时段充电,尽量避免11:00-13:00高电价区间充电,保证抵达终点时有至少15%的电</textarea>
             </div>
             
             <button id="plan-button" class="btn btn-primary">
@@ -642,6 +644,13 @@
             
             // 点击规划按钮切换到路线页面
             planButton.addEventListener('click', function() {
+              const startPoint = document.getElementById('startPoint').value.trim();
+              const endPoint = document.getElementById('stopPoint').value.trim();
+
+              if (!startPoint || !endPoint) {
+                alert('input error');
+              }
+
                 inputPage.classList.remove('active');
                 routePage.classList.add('active');
                 document.body.scrollTop = 0;
