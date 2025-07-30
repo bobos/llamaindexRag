@@ -397,6 +397,64 @@
             font-size: 20px;
         }
 
+        /* 容器样式 */
+        .switch-container {
+            margin: 50px auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* 自定义开关样式（关键部分） */
+        .custom-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;  /* 开关宽度 */
+            height: 34px; /* 开关高度 */
+        }
+
+        /* 隐藏原生 checkbox（保留交互能力） */
+        .custom-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        /* 滑块样式 */
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc; /* 未选中时的背景色 */
+            transition: .4s; /* 动画过渡 */
+            border-radius: 34px; /* 圆角 */
+        }
+
+        /* 滑块上的圆形按钮 */
+        .slider::before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%; /* 圆形 */
+        }
+
+        /* 选中状态下的背景色 */
+        input:checked + .slider {
+            background-color: #2196F3; /* 选中时的蓝色 */
+        }
+
+        /* 选中状态下滑块的位置 */
+        input:checked + .slider::before {
+            transform: translateX(26px); /* 向右移动26px（60px总宽 - 26px滑块宽 - 4px边距*2） */
+        }
+
         /* 移动端适配 */
         @media (max-width: 480px) {
             .container {
@@ -435,6 +493,14 @@
                     <input type="text" class="input-control" id="apikey" placeholder="输入apiKey">
                 </div>
 
+    <div class="switch-container">
+        <h4>response format support</h4>
+        <label class="custom-switch">
+            <input type="checkbox" id="responseFormat">
+            <span class="slider"></span>
+        </label>
+    </div>
+
                 <div class="input-group">
                     <label class="input-label">出发地点</label>
                     <input type="text" class="input-control" id="startPoint" placeholder="输入起点位置" value="广州市黄埔区中新知识城招商雍景湾">
@@ -471,14 +537,14 @@
                     <input type="text" class="input-control" id="maxSoc" value="85">
                 </div>
                 
-                <div class="preference-row">
-                    <div class="preference-label">保守规划</div>
-                    <div class="switch">
-                        <input id="strategy" type="checkbox" checked>
-                        <span class="slider"></span>
-                    </div>
-                </div>
-            </div>
+                <div class="switch-container">
+        <h4>保守策略</h4>
+        <label class="custom-switch">
+            <input type="checkbox" id="strategy">
+            <span class="slider"></span>
+        </label>
+    </div>
+           </div>
             
             <div class="card">
                 <div class="card-title">
@@ -517,7 +583,7 @@
             </div>
             
             <div class="route-map">
-                <div class="route-summary card">
+                <div id="route-summary" class="route-summary card">
                     <div class="step-header">
                         <div class="step-title">上海火车站 → 杭州西湖</div>
                         <div class="step-time">总行程: 3小时20分</div>
@@ -541,7 +607,7 @@
                 <div id="route-timeline" class="route-timeline">
                     <div class="route-line"></div>
                     
-                    <!-- 当前位置 -->
+                    <!-- 当前位置 
                     <div class="step-card current">
                         <div class="step-marker current">
                             <i class="fas fa-car"></i>
@@ -562,11 +628,12 @@
                         </div>
                     </div>
                     
-                    <!-- 路线信息标签 -->
+                    路线信息标签
                     <div class="route-note">
                         <i class="fas fa-exclamation-triangle" style="color: var(--warning); margin-right: 5px;"></i>
                         注意：前方路段有强降雨，建议降低车速
                     </div>
+                    -->
                 </div>
             </div>
             
@@ -604,22 +671,27 @@ function getGravityEnergyKwh(distance, weight, altitudeDiff, eta = 0.25) {
 }
 let chatModel = '';
 let apiKey = '';
-async function generateRoute(key, model, startAddress, destAddres, startTime, startSoc, maxSoc, minSoc, presets, otherRequirement) {
-    chatModel = models[model];
+let supportResponseFormat = false;
+let totalDistance = 0;
+let totalMins = 0;
+async function generateRoute(key, model, responseFormat, startAddress, destAddres, startTime, startSoc, maxSoc, minSoc, presets, otherRequirement) {
+    supportResponseFormat = responseFormat;
+    chatModel = models[model] || model;
+    print(`${key}|${chatModel}|${responseFormat}|${startAddress}|${destAddres}|${startTime}|${startSoc}|${maxSoc}|${minSoc}|${presets[0]}|${otherRequirement}`);
     apiKey = key;
     const { stops, totalConsumption, totalDistance } = await collectStops({ location: await convLocation(startAddress), name: startAddress }, { location: await convLocation(destAddres), name: destAddres });
     if (maxBattery * (1 - minSoc) >= totalConsumption) {
-        alert(`enough soc left ${Math.floor((maxBattery - totalConsumption) / maxBattery * 100)}%, no need to plan charging`);
+        alert(`enough soc left ${Math.floor((maxBattery - totalConsumption) / maxBattery * 100)}%, total ${totalDistance} km, no need to plan charging`);
         return [];
     }
     const aiPlan = await plan(stops, startTime, startSoc, maxSoc, minSoc, presets, otherRequirement);
+    totalMins = toMinutes(aiPlan[aiPlan.length -1].arrivalTime) - toMinutes(startTime);
     return aiPlan;
 }
 async function collectStops(startStation, endStation) {
     const stops = [];
     let prevStation = startStation;
     let totalConsumption = 0;
-    let totalDistance = 0;
     const path = await getPath(startStation.location, endStation.location);
     for (const step of path.steps) {
         const distance = parseInt(step.step_distance);
@@ -635,7 +707,7 @@ async function collectStops(startStation, endStation) {
                 totalConsumption += nextStop.consumedBattery;
                 totalDistance += nextStop.distance;
                 prevStation = ret;
-                print(`${JSON.stringify(nextStop)} ${totalDistance}`);
+                print(`${nextStop.end} ${totalDistance.toFixed()}公里`);
             }
         }
     }
@@ -769,7 +841,7 @@ async function getNearestStop(location, cities, prevStation) {
 }
 ;
 async function request(path) {
-    await sleep(1);
+    await sleep(0.5);
     const reqUrl = `https://restapi.amap.com${path}&key=d0e0aab6356af92b0cd0763cae27ba35&output=json`;
     let response = await fetch(reqUrl);
     if (!response.ok)
@@ -793,12 +865,18 @@ async function sleep(sec) {
 var Preset;
 (function (Preset) {
     Preset["conservative"] = "**conservative**:make sure there is always a backup service stop to recharge in case driver arrives at the planned service stop and finds out it is out of service, make sure soc is above 5% when car arrives the backup service stop.**tag**:None";
-    Preset["aggressive"] = "**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:\u8BF7\u6CE8\u610F\u8BE5\u70B9\u5145\u7535\u6869\u60C5\u51B5";
+    Preset["aggressive"] = "**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:注意补电";
 })(Preset || (Preset = {}));
 function toMinutes(time) {
     let [hour, min] = time.split(':');
     return parseInt(hour) * 60 + parseInt(min);
 }
+function toDate(min) {
+    let h = Math.floor(min / 60);
+    let m = min % 60;
+    return `${h < 10 ? '0'+h : h}:${m < 10 ? '0'+m : m}`
+}
+
 function calculateConsumptionAndTime(from, to, stops) {
     let time = 0;
     let kwh = 0;
@@ -902,7 +980,7 @@ function verifyPlan(plan, stops, startTime) {
             print(err);
             return err;
         }
-        plan.push({ fromStop: lastPlannedStop, arrivalStop: lastStop, backupStop: 'No', arrivalTime: `${last.departureTime} + ${time}分`, departureTime: '', socBeforeRecharge: Math.floor(leftKwh / maxBattery * 100), rechargeTime: 0, socAfterRecharge: -1, tags: ['到达目的地'] });
+        plan.push({ fromStop: lastPlannedStop, arrivalStop: lastStop, backupStop: 'No', arrivalTime: `${toDate(toMinutes(last.departureTime) + time)}`, departureTime: '', socBeforeRecharge: Math.floor(leftKwh / maxBattery * 100), rechargeTime: 0, socAfterRecharge: -1, tags: ['到达目的地'] });
     }
     return '';
 }
@@ -1018,7 +1096,7 @@ ${JSON.stringify(stops.map(({ start, end, consumedTime, consumedBattery }) => { 
                 content: 'You are a helpful assistant for to help user make all kinds of accurate and efficient plans, when you are crunching numbers, double check the correctness of your calculation.'
             },
             {
-                content: promptForDsR1,
+                content: supportResponseFormat? prompt : promptForDsR1,
                 role: 'user'
             }
         ];
@@ -1057,7 +1135,7 @@ ${JSON.stringify(stops.map(({ start, end, consumedTime, consumedBattery }) => { 
 }
 let callCnt = 0;
 async function askLlm(host, key, model, messages, response_format) {
-    print('call LLM: ' + JSON.stringify(messages));
+    print('call LLM ... ');
     const body = {
         model,
         messages,
@@ -2230,7 +2308,25 @@ const ServiceStops = {
     "黔南布依族苗族自治州": QianNanServiceStops,
 };
 
-        function renderSteps(steps) {
+        function renderSteps(startPoint, endPoint, steps) {
+          const summary = document.getElementById('route-summary');
+          const summaryCard = document.createElement('div');
+          summaryCard.innerHTML =`<div class="step-header">
+                        <div class="step-title">${startPoint} → ${endPoint}</div>
+                        <div class="step-time">总行程: ${Math.floor(totalMins / 60)}小时${totalMins % 60}分</div>
+                    </div>
+                    <div class="step-details">
+                        <div class="detail-item">
+                            <div class="detail-value">${totalDistance} km</div>
+                            <div class="detail-label">总里程</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-value">${steps.length -1} 次</div>
+                            <div class="detail-label">充电</div>
+                        </div>
+                    </div>`
+          summary.appendChild(summaryCard);
+
           const parent = document.getElementById('route-timeline');
           let stepMarker = 1;
           for(const step of steps) {
@@ -2283,11 +2379,12 @@ const ServiceStops = {
               const minSoc = parseInt(document.getElementById('minSoc').value.trim());
               const conservative = document.getElementById('strategy').checked;
               const requirements = document.getElementById('freeRequirement').value.trim();
+              const supportResponseFormat = document.getElementById('responseFormat').checked;
             
               inputPage.classList.remove('active');
               loadingPage.classList.add('active');
               try {
-                const aiPlan = await generateRoute(key, model, startPoint, endPoint, startTime, startSoc, maxSoc, minSoc, [conservative ? Preset.conservative : Preset.aggressive], requirements);
+                const aiPlan = await generateRoute(key, model, supportResponseFormat, startPoint, endPoint, startTime, startSoc, maxSoc, minSoc, [conservative ? Preset.conservative : Preset.aggressive], requirements);
                 if (aiPlan.length > 0) {
                   loadingPage.classList.remove('active');
                   routePage.classList.add('active');
