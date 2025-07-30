@@ -525,7 +525,7 @@
                     </div>
                 </div>
                 
-                <div class="route-timeline">
+                <div id="route-timeline" class="route-timeline">
                     <div class="route-line"></div>
                     
                     <!-- 当前位置 -->
@@ -554,93 +554,6 @@
                         <i class="fas fa-exclamation-triangle" style="color: var(--warning); margin-right: 5px;"></i>
                         注意：前方路段有强降雨，建议降低车速
                     </div>
-                    
-                    <!-- 第一个充电点 -->
-                    <div class="step-card">
-                        <div class="step-marker">1</div>
-                        <div class="step-header">
-                            <div class="step-title">嘉兴南湖服务区</div>
-                            <div class="step-time">预计 10:20</div>
-                        </div>
-                        <div class="step-details">
-                            <div class="detail-item">
-                                <div class="detail-value">18%</div>
-                                <div class="detail-label">到达电量</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-value">30分</div>
-                                <div class="detail-label">充电时间</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-value">80%</div>
-                                <div class="detail-label">目标电量</div>
-                            </div>
-                        </div>
-                        <div class="badge-container">
-                            <div class="badge badge-pref">
-                                <i class="fas fa-utensils"></i> 用餐时间充电
-                            </div>
-                            <div class="badge badge-pref">
-                                <i class="fas fa-coins"></i> 低峰电价
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 路线信息标签 -->
-                    <div class="route-note">
-                        <i class="fas fa-mountain" style="color: var(--dark); margin-right: 5px;"></i>
-                        前方20公里有爬坡路段，建议保留足够电量
-                    </div>
-                    
-                    <!-- 第二个充电点 -->
-                    <div class="step-card">
-                        <div class="step-marker">2</div>
-                        <div class="step-header">
-                            <div class="step-title">余杭未来科技城</div>
-                            <div class="step-time">预计 12:50</div>
-                        </div>
-                        <div class="step-details">
-                            <div class="detail-item">
-                                <div class="detail-value">25%</div>
-                                <div class="detail-label">到达电量</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-value">35分</div>
-                                <div class="detail-label">充电时间</div>
-                            </div>
-                            <div class="detail-item">
-                                <div class="detail-value">85%</div>
-                                <div class="detail-label">目标电量</div>
-                            </div>
-                        </div>
-                        <div class="badge-container">
-                            <div class="badge badge-pref">
-                                <i class="fas fa-leaf"></i> 用户偏好：高速服务区
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 目的地 -->
-                    <div class="step-card">
-                        <div class="step-marker">
-                            <i class="fas fa-flag-checkered"></i>
-                        </div>
-                        <div class="step-header">
-                            <div class="step-title">杭州西湖风景区</div>
-                            <div class="step-time">预计 13:50</div>
-                        </div>
-                        <div class="step-details">
-                            <div class="detail-item">
-                                <div class="detail-value">38%</div>
-                                <div class="detail-label">到达电量</div>
-                            </div>
-                        </div>
-                        <div class="badge-container">
-                            <div class="badge badge-route">
-                                <i class="fas fa-check-circle"></i> 终点站
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
             
@@ -651,6 +564,75 @@
     </div>
     
     <script>
+    const rechargingPlan = [
+    {
+      "arrivalStop": "怀城服务区(二广高速二连浩特方向)",
+      "arrivalTime": "08:37",
+      "backupStop": "白马服务区(汕昆高速昆明方向)",
+      "departureTime": "09:02",
+      "fromStop": "广州市黄埔区中新知识城招商雍景湾",
+      "rechargeTime": 25,
+      "socAfterRecharge": 90,
+      "socBeforeRecharge": 45,
+      "tags": ["早餐充电"]
+    },
+    {
+      "arrivalStop": "同古服务区(包茂高速包头方向)",
+      "arrivalTime": "10:29",
+      "backupStop": "同安停车区(包茂高速包头方向)",
+      "departureTime": "10:54",
+      "fromStop": "怀城服务区(二广高速二连浩特方向)",
+      "rechargeTime": 25,
+      "socAfterRecharge": 90,
+      "socBeforeRecharge": 44,
+      "tags": []
+    },
+    {
+      "arrivalStop": "五通服务区(包茂高速包头方向)",
+      "arrivalTime": "12:50",
+      "backupStop": "宛田服务区(包茂高速包头方向)",
+      "departureTime": "13:05",
+      "fromStop": "同古服务区(包茂高速包头方向)",
+      "rechargeTime": 15,
+      "socAfterRecharge": 60,
+      "socBeforeRecharge": 33,
+      "tags": ["避开高价电"]
+    }
+  ];
+ 
+        function renderSteps(steps) {
+          const parent = document.getElementById('route-timeline');
+          let stepMarker = 1;
+          for(const step of steps) {
+            const stepCard = document.createElement('div');
+            stepCard.className = 'step-card';
+            const tags = step.tags.map(tag => `<div class="badge badge-pref"><i class="fas fa-leaf"></i>${tag}</div>`).join(' ');
+            stepCard.innerHTML = `<div class="step-marker">${stepMarker++}</div>
+<div class="step-header">
+    <div class="step-title">${step.arrivalStop}</div>
+    <div class="step-time">预计到达 ${step.arrivalTime}</div>
+</div>
+<div class="step-details">
+    <div class="detail-item">
+        <div class="detail-value">${step.socBeforeRecharge}%</div>
+        <div class="detail-label">到达电量</div>
+    </div>
+    <div class="detail-item">
+        <div class="detail-value">${step.rechargeTime}分</div>
+        <div class="detail-label">充电时长</div>
+    </div>
+    <div class="detail-item">
+        <div class="detail-value">${step.socAfterRecharge}%</div>
+        <div class="detail-label">充电至</div>
+    </div>
+</div>
+<div class="badge-container">
+  ${tags}
+</div> `;
+            parent.appendChild(stepCard);
+          }
+        }
+
         // 页面切换控制
         document.addEventListener('DOMContentLoaded', function() {
             const inputPage = document.getElementById('input-page');
@@ -664,6 +646,7 @@
                 routePage.classList.add('active');
                 document.body.scrollTop = 0;
                 document.documentElement.scrollTop = 0;
+                renderSteps(rechargingPlan);
             });
             
             // 点击返回按钮切换到输入页面
