@@ -540,7 +540,7 @@
                 
                 <div class="input-group">
                     <label class="input-label">保电目标</label>
-                    <input type="text" class="input-control" id="minSoc" value="13">
+                    <input type="text" class="input-control" id="minSoc" value="15">
                 </div>
                 
                 <div class="input-group">
@@ -561,11 +561,11 @@
             
             <div class="card">
                 <div class="card-title">
-                    <i class="fas fa-user-cog"></i> 自定义偏好
+                    <i class="fas fa-user-cog"></i>个人需求
                 </div>
                 
                 <textarea class="input-control" id='freeRequirement' placeholder="输入您的特别要求，如：优先使用国家电网，避开拥挤充电站..." 
-                  rows="3">优先安排早餐时段充电,尽量避免11:00-13:00高电价区间充电,抵达终点时电量保持在10%左右</textarea>
+                  rows="3">优先安排早餐时段充电,抵达终点时电量控制在12%左右,如果可能尽量避免在11:00-13:00高电价区间充电</textarea>
             </div>
             
             <button id="plan-button" class="btn btn-primary">
@@ -648,14 +648,14 @@ function print(line) {
     lineDiv.innerHTML = line;
     parent.appendChild(lineDiv);
 }
-function getGravityEnergyKwh(distance, weight, altitudeDiff, eta = 0.3) {
+function getGravityEnergyKwh(distance, weight, altitudeDiff, eta = 0.25) {
     const massKg = weight * 1000;
     const g = 9.8;
     const d = distance * 1000;
     const slope = altitudeDiff / d;
     const slopeRad = Math.atan(slope);
     const slopeForce = massKg * g * Math.sin(slopeRad);
-    const slopeEnergy = 1.5 * (slopeForce * d) / J2KwhFactor; // 1.2为精准系数，考虑到路途中起伏难测，加到1.5
+    const slopeEnergy = 1.6 * (slopeForce * d) / J2KwhFactor; // 1.2为精准系数，考虑到路途中起伏难测，加到1.6
     return altitudeDiff >= 0 ? slopeEnergy : slopeEnergy * eta;
 }
 let chatModel = '';
@@ -696,6 +696,7 @@ async function collectStops(startStation, endStation) {
                 stops.push(nextStop);
                 totalConsumption += nextStop.consumedBattery;
                 totalDistance += nextStop.distance;
+                nextStop.distanceTillNow = totalDistance.toFixed();
                 prevStation = ret;
                 print(`${nextStop.end} ${totalDistance.toFixed()}公里`);
             }
@@ -706,6 +707,7 @@ async function collectStops(startStation, endStation) {
         stops.push(nextStop);
         totalConsumption += nextStop.consumedBattery;
         totalDistance += nextStop.distance;
+        nextStop.distanceTillNow = totalDistance.toFixed();
         print(`${nextStop.end} ${totalDistance.toFixed()}公里`);
     }
     return { stops, totalConsumption, totalDistance };
@@ -893,7 +895,7 @@ function calculateConsumptionAndTime(from, to, stops) {
             if (!found)
                 break;
             else
-                return [kwh, time, inBetween.join('-'), lift, dive];
+                return [kwh, time, inBetween.join('-'), lift, dive, stop.distanceTillNow];
         } else {
             if (found) {
                 inBetween.push(`${stop.end.split('(')[0]}(${stop.distance}km,${Math.ceil(stop.consumedBattery / maxBattery * 100)}%)`);
@@ -914,9 +916,10 @@ function verifyPlan(plan, stops, startTime) {
       throw new Error(err);
     }
     for (const step of plan) {
-        const [kwh, time, _, lift, dive] = calculateConsumptionAndTime(step.fromStop, step.arrivalStop, stops);
+        const [kwh, time, _, lift, dive, distanceTillNow] = calculateConsumptionAndTime(step.fromStop, step.arrivalStop, stops);
         step.lift = lift;
         step.dive = dive;
+        step.distanceTillNow = distanceTillNow;
 
         totalTime += time;
         let tempLeftKwh = leftKwh;
@@ -940,7 +943,7 @@ function verifyPlan(plan, stops, startTime) {
                     return err;
                 }
             }
-            const [kwh, _time, _, _lift, _dive] = calculateConsumptionAndTime(step.fromStop, step.backupStop, stops);
+            const [kwh, _time, _, _lift, _dive, _dist] = calculateConsumptionAndTime(step.fromStop, step.backupStop, stops);
             tempLeftKwh -= kwh;
             if (tempLeftKwh < minKwh) {
                 const err = `The hard minimal allowed Soc is ${hardMinSoc}%, but according to your plan, the remaining Soc from ${step.fromStop} to backup stop ${step.backupStop} will be under ${hardMinSoc}%`;
@@ -985,14 +988,14 @@ function verifyPlan(plan, stops, startTime) {
     const lastPlannedStop = last.arrivalStop;
     const lastStop = stops[stops.length - 1].end;
     if (!matchStopName(lastStop, lastPlannedStop)) {
-        const [kwh, time, _, lift, dive] = calculateConsumptionAndTime(lastPlannedStop, lastStop, stops);
+        const [kwh, time, _, lift, dive, distanceTillNow] = calculateConsumptionAndTime(lastPlannedStop, lastStop, stops);
         leftKwh -= kwh;
         if (leftKwh < minKwh) {
             const err = `The hard minimal allowed Soc is ${hardMinSoc}%, but according to your plan, the remaining Soc from ${lastPlannedStop} to ${lastStop} will be under ${hardMinSoc}%`;
             print(err);
             return err;
         }
-        plan.push({lift, dive, fromStop: lastPlannedStop, arrivalStop: lastStop, backupStop: 'No', arrivalTime: `${toDate(toMinutes(last.departureTime) + time)}`, departureTime: '', socBeforeRecharge: Math.floor(leftKwh / maxBattery * 100), rechargeTime: 'N/A', socAfterRecharge: 'N/A', tags: [{tag: '到达目的地', icon: 'fa fa-map-marker'}] });
+        plan.push({lift, dive, distanceTillNow, fromStop: lastPlannedStop, arrivalStop: lastStop, backupStop: 'No', arrivalTime: `${toDate(toMinutes(last.departureTime) + time)}`, departureTime: '', socBeforeRecharge: Math.floor(leftKwh / maxBattery * 100), rechargeTime: 'N/A', socAfterRecharge: 'N/A', tags: [{tag: '到达目的地', icon: 'fa fa-map-marker'}] });
     }
     return '';
 }
@@ -1011,6 +1014,7 @@ please assist the EV driver to make a recharging plan based on below info:
 - Max recharge to Soc: ${maxSoc}%
 - Minimal allowed Soc: ${minSoc}%, minimal allowed soc before arriving at a recharging stop
 - Charging rate: ${chargeSpeed}Kwh per hour
+- The charged Soc must be greater than(including) 20% for each recharging
 - Reduce the recharging times as less as possible to save overall trip time
 
 **route data structure info**:
@@ -2314,6 +2318,95 @@ const WuZhouServiceStops = {
         { name: '白沙停车区(包茂高速包头方向)', location: '111.186723,23.408933', altitude: 23 },
     ]
 };
+const QingYuanServiceStops = {
+佛冈县: [
+    {name: '龙山服务区(广连高速连州方向)', location: '113.335848,23.787596', altitude: 27},
+    {name: '龙山服务区(广连高速广州方向)', location: '113.335099,23.785674', altitude: 27},
+    {name: '高岗服务区(京港澳高速北京方向)', location: '113.607880,23.980270', altitude: 120},
+    {name: '高岗服务区(京港澳高速深圳方向)', location: '113.608053,23.976508', altitude: 120},
+    {name: '佛冈服务区(京港澳高速深圳方向)', location: '113.523912,23.845370', altitude: 72},
+    {name: '佛冈停车区(京港澳高速北京方向)', location: '113.516931,23.838493', altitude: 72},
+    {name: '汤塘服务区(汕湛高速湛江方向)', location: '113.558635,23.757488', altitude: 124},
+    {name: '汤塘服务区(汕湛高速汕头方向)', location: '113.556978,23.756364', altitude: 124},
+],
+清城区: [
+    {name: '清城服务区(佛清从高速佛山方向)', location: '113.139223,23.641209', altitude: 21},
+    {name: '清城服务区(佛清从高速从化方向)', location: '113.140185,23.639797', altitude: 21},
+    {name: '横荷服务区(许广高速广州方向)', location: '113.041553,23.618433', altitude: 9},
+    {name: '横荷服务区(许广高速许昌方向)', location: '113.042760,23.619086', altitude: 9},
+    {name: '清远服务区(汕湛高速湛江方向)', location: '113.155052,23.759351', altitude: 46},
+    {name: '清远服务区(汕湛高速汕头方向)', location: '113.155553,23.757051', altitude: 46},
+    {name: '石角停车区(佛清从高速从化方向)', location: '113.021487,23.533695', altitude: 32},
+    {name: '石角停车区(佛清从高速佛山方向)', location: '113.018877,23.532366', altitude: 32},
+],
+清新区: [
+    {name: '清新服务区(许广高速许昌方向)', location: '112.926758,23.934950', altitude: 89},
+    {name: '清新服务区(许广高速广州方向)', location: '112.925134,23.934695', altitude: 89},
+    {name: '回澜停车区(许广高速许昌方向)', location: '112.963094,23.675566', altitude: 16},
+    {name: '回澜停车区(许广高速广州方向)', location: '112.961076,23.676481', altitude: 16},
+    {name: '龙湾停车区(汕湛高速湛江方向)', location: '112.897080,23.711515', altitude: 64},
+    {name: '龙湾停车区(汕湛高速汕头方向)', location: '112.899888,23.712415', altitude: 64},
+],
+英德市: [
+    {name: '黎溪服务区(乐广高速广州方向)', location: '113.224510,23.977485', altitude: 69},
+    {name: '黎溪服务区(乐广高速乐昌方向)', location: '113.226579,23.976623', altitude: 69},
+    {name: '英红服务区(乐广高速乐昌方向)', location: '113.434116,24.375336', altitude: 51},
+    {name: '英红服务区(乐广高速广州方向)', location: '113.434156,24.378813', altitude: 51},
+    {name: '水边服务区(广连高速连州方向)', location: '113.154671,24.053643', altitude: 107},
+    {name: '水边服务区(广连高速广州方向)', location: '113.153664,24.050320', altitude: 107},
+    {name: '大湾服务区(广连高速连州方向)', location: '112.945165,24.315242', altitude: 57},
+    {name: '大湾服务区(广连高速广州方向)', location: '112.943823,24.313859', altitude: 57},
+    {name: '横石水服务区(京港澳高速北京方向)', location: '113.777164,24.408257', altitude: 139},
+    {name: '横石水服务区(京港澳高速深圳方向)', location: '113.775598,24.408289', altitude: 139},
+    {name: '英德停车区(乐广高速广州方向)', location: '113.341391,24.152396', altitude: 104},
+    {name: '英德停车区(乐广高速乐昌方向)', location: '113.342010,24.151141', altitude: 104},
+    {name: '石灰铺服务区(汕昆高速昆明方向)', location: '113.187223,24.225621', altitude: 61},
+    {name: '石灰铺服务区(汕昆高速汕头方向)', location: '113.187905,24.224227', altitude: 61},
+    {name: '九龙服务区(汕昆高速汕头方向)', location: '112.916729,24.105103', altitude: 111},
+    {name: '九龙服务区(汕昆高速昆明方向)', location: '112.916574,24.106651', altitude: 111},
+    {name: '浛洸停车区(广连高速连州方向)', location: '113.069472,24.237128', altitude: 128},
+    {name: '浛洸停车区(广连高速广州方向)', location: '113.068586,24.236591', altitude: 128},
+    {name: '黎溪停车区(广连高速广州方向)', location: '113.271800,23.955079', altitude: 71},
+    {name: '黎溪停车区(广连高速连州方向)', location: '113.272252,23.956502', altitude: 71},
+    {name: '鱼湾服务区(京港澳高速深圳方向)', location: '113.663221,24.153776', altitude: 76},
+    {name: '鱼湾服务区(京港澳高速北京方向)', location: '113.664443,24.154059', altitude: 76},
+    {name: '东华服务区(汕昆高速汕头方向)', location: '113.629478,24.245852', altitude: 109},
+    {name: '东华服务区(汕昆高速昆明方向)', location: '113.629624,24.247370', altitude: 109},
+    {name: '望埠停车区(汕昆高速汕头方向)', location: '113.466425,24.290933', altitude: 57},
+    {name: '望埠停车区(汕昆高速昆明方向)', location: '113.467900,24.292064', altitude: 57},
+],
+连山壮族瑶族自治县: [
+    {name: '连山南服务区(二广高速广州方向)', location: '112.120388,24.278896', altitude: 251},
+    {name: '连山南服务区(二广高速二连浩特方向)', location: '112.122422,24.278652', altitude: 251},
+    {name: '连山东服务区(二广高速广州方向)', location: '112.238245,24.705628', altitude: 219},
+    {name: '连山东服务区(二广高速二连浩特方向)', location: '112.239308,24.704979', altitude: 219},
+    {name: '永丰停车区(二广高速二连浩特方向)', location: '112.087549,24.470684', altitude: 296},
+    {name: '永丰停车区(二广高速广州方向)', location: '112.086468,24.471144', altitude: 296},
+],
+连州市: [
+    {name: '大路边服务区(广连高速连州方向)', location: '112.620678,25.002820', altitude: 152},
+    {name: '大路边服务区(广连高速广州方向)', location: '112.618878,25.003777', altitude: 152},
+    {name: '丰阳服务区(二广高速广州方向)', location: '112.254555,25.046182', altitude: 215},
+    {name: '丰阳服务区(二广高速二连浩特方向)', location: '112.257388,25.044558', altitude: 215},
+    {name: '龙坪停车区(广连高速广州方向)', location: '112.582761,24.817420', altitude: 244},
+    {name: '龙坪停车区(广连高速连州方向)', location: '112.584235,24.815492', altitude: 244},
+    {name: '连州服务区(许广高速许昌方向)', location: '112.532536,24.976269', altitude: 148},
+    {name: '连州服务区(许广高速广州方向)', location: '112.530898,24.977238', altitude: 148},
+    {name: '青龙停车区(二广高速广州方向)', location: '112.286674,24.816272', altitude: 179},
+    {name: '青龙停车区(二广高速二连浩特方向)', location: '112.287603,24.815821', altitude: 179},
+],
+阳山县: [
+    {name: '岭背服务区(广连高速连州方向)', location: '112.690687,24.614091', altitude: 77},
+    {name: '岭背服务区(广连高速广州方向)', location: '112.688327,24.615155', altitude: 77},
+    {name: '阳山南服务区(许广高速许昌方向)', location: '112.698975,24.233710', altitude: 343},
+    {name: '阳山南服务区(许广高速广州方向)', location: '112.698286,24.229943', altitude: 343},
+    {name: '阳山北服务区(许广高速广州方向)', location: '112.429358,24.580061', altitude: 116},
+    {name: '阳山北服务区(许广高速许昌方向)', location: '112.430800,24.580219', altitude: 116},
+    {name: '杨梅服务区(汕昆高速汕头方向)', location: '112.542692,24.093410', altitude: 473},
+    {name: '杨梅服务区(汕昆高速昆明方向)', location: '112.542715,24.095134', altitude: 473},
+],
+}
+
 const ServiceStops = {
     "广州市": GuangZhouServiceStops,
     "佛山市": FoShanServiceStops,
@@ -2330,6 +2423,7 @@ const ServiceStops = {
     "黔西南布依族苗族自治州": QianXiNanServiceStops,
     "遵义市": ZunYiServiceStops,
     "黔南布依族苗族自治州": QianNanServiceStops,
+    "清远市": QingYuanServiceStops,
 };
 
         function renderSteps(startPoint, endPoint, steps) {
@@ -2381,7 +2475,7 @@ const ServiceStops = {
             stepCard.innerHTML = `<div class="step-marker">${stepMarker++}</div>
 <div class="detail-label">${step.inBetween}</div>
 <div class="step-header">
-    <div class="step-title">${step.arrivalStop.split('(')[0]}</div>
+    <div class="step-title">${step.arrivalStop.split('(')[0]}(${step.distanceTillNow}km)</div>
     <div class="step-time">预计到达 ${step.arrivalTime}</div>
 </div>
 <div class="step-details">
