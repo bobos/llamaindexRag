@@ -584,24 +584,6 @@
             
             <div class="route-map">
                 <div id="route-summary" class="route-summary card">
-                    <div class="step-header">
-                        <div class="step-title">上海火车站 → 杭州西湖</div>
-                        <div class="step-time">总行程: 3小时20分</div>
-                    </div>
-                    <div class="step-details">
-                        <div class="detail-item">
-                            <div class="detail-value">325 km</div>
-                            <div class="detail-label">总里程</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-value">2 次</div>
-                            <div class="detail-label">充电</div>
-                        </div>
-                        <div class="detail-item">
-                            <div class="detail-value">87 元</div>
-                            <div class="detail-label">电费</div>
-                        </div>
-                    </div>
                 </div>
                 
                 <div id="route-timeline" class="route-timeline">
@@ -716,7 +698,7 @@ async function collectStops(startStation, endStation) {
         stops.push(nextStop);
         totalConsumption += nextStop.consumedBattery;
         totalDistance += nextStop.distance;
-        print(`${JSON.stringify(nextStop)} ${totalDistance}`);
+        print(`${nextStop.end} ${totalDistance.toFixed()}公里`);
     }
     return { stops, totalConsumption, totalDistance };
 }
@@ -778,6 +760,7 @@ const models = {
     o4mini: 'openai/o4-mini',
     glm: 'z-ai/glm-4.5',
     glmfree: 'z-ai/glm-4.5-air:free',
+    gemini: 'google/gemini-2.5-flash',
 };
 const openrouterHost = 'https://openrouter.ai/api/v1/chat/completions';
 const tools = [{
@@ -865,7 +848,7 @@ async function sleep(sec) {
 var Preset;
 (function (Preset) {
     Preset["conservative"] = "**conservative**:make sure there is always a backup service stop to recharge in case driver arrives at the planned service stop and finds out it is out of service, make sure soc is above 5% when car arrives the backup service stop.**tag**:None";
-    Preset["aggressive"] = "**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:注意补电";
+    Preset["aggressive"] = "**aggressive**:make sure car arrives at planned service stop with soc above minimal allowed soc.**tag**:注意预留百分之几的虚电";
 })(Preset || (Preset = {}));
 function toMinutes(time) {
     let [hour, min] = time.split(':');
@@ -1145,7 +1128,7 @@ async function askLlm(host, key, model, messages, response_format) {
             enabled: true
         }
     };
-    if (response_format !== undefined) {
+    if (response_format !== undefined && supportResponseFormat) {
         body.response_format = response_format;
     }
     let response = await fetch(host, {
@@ -2385,10 +2368,41 @@ const ServiceStops = {
               loadingPage.classList.add('active');
               try {
                 const aiPlan = await generateRoute(key, model, supportResponseFormat, startPoint, endPoint, startTime, startSoc, maxSoc, minSoc, [conservative ? Preset.conservative : Preset.aggressive], requirements);
+//const aiPlan = [{
+//arrivalStop : "贺州服务区(汕昆高速昆明方向)",
+//arrivalTime : "09:32",
+//backupStop : "",
+//departureTime : "10:11",
+//fromStop : "广州市黄埔区中新知识城招商雍景湾",
+//rechargeTime : 39,
+//socAfterRecharge : 85,
+//socBeforeRecharge : 16,
+//tags : ['注意补电']},
+//{arrivalStop : "五通服务区(包茂高速包头方向)",
+//arrivalTime : "12:35",
+//backupStop : "",
+//departureTime : "13:15",
+//fromStop : "贺州服务区(汕昆高速昆明方向)",
+//rechargeTime : 40,
+//socAfterRecharge : 85,
+//socBeforeRecharge : 15,
+//tags : ['注意补电', '避免高电价']},
+//{
+//arrivalStop : "广西壮族自治区柳州市三江侗族自治县浔江大道59",
+//arrivalTime : "14:15",
+//backupStop : "No",
+//departureTime : "",
+//fromStop : "五通服务区(包茂高速包头方向)",
+//rechargeTime : 0,
+//socAfterRecharge : -1,
+//socBeforeRecharge : 57,
+//tags : ['到达目的地']
+//} ]
                 if (aiPlan.length > 0) {
                   loadingPage.classList.remove('active');
                   routePage.classList.add('active');
-                  renderSteps(aiPlan);
+                  console.log(aiPlan)
+                  renderSteps(startPoint, endPoint, aiPlan);
                 }
               } catch (err) {
                 print(err.message);
