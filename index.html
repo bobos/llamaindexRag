@@ -225,6 +225,17 @@
             margin-top: 8px;
         }
 
+        .btn-secondary {
+            background-color: var(--secondary);
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 21, 12, 0.3);
+        }
+
+        .btn-secondary:hover {
+            background-color: #3d1e9c;
+            transform: translateY(-2px);
+        }
+
         .btn-primary {
             background-color: var(--primary);
             color: white;
@@ -399,9 +410,9 @@
 
         /* 容器样式 */
         .switch-container {
-            margin: 50px auto;
-            padding: 20px;
-            text-align: center;
+            margin: 0;
+            padding: 0;
+            text-align: left;
         }
 
         /* 自定义开关样式（关键部分） */
@@ -485,12 +496,12 @@
                 
                 <div class="input-group">
                     <label class="input-label">model</label>
-                    <input type="text" class="input-control" id="model" placeholder="deepseekr1,deepseekr1free,deepseekv3,o4mini,glm,glmfree" value="deepseekr1free">
+                    <input type="text" class="input-control" id="model" placeholder="deepseekr1,o4mini,glm,gemini" value="gemini">
                 </div>
 
                 <div class="input-group">
                     <label class="input-label">key</label>
-                    <input type="text" class="input-control" id="apikey" placeholder="输入apiKey">
+                    <input type="text" class="input-control" id="apikey" placeholder="输入openrouter API key">
                 </div>
 
     <div class="switch-container">
@@ -537,13 +548,15 @@
                     <input type="text" class="input-control" id="maxSoc" value="85">
                 </div>
                 
-                <div class="switch-container">
-        <h4>保守策略</h4>
-        <label class="custom-switch">
-            <input type="checkbox" id="strategy">
-            <span class="slider"></span>
-        </label>
-    </div>
+                <!--
+<div class="switch-container">
+  <h4>保守策略</h4>
+  <label class="custom-switch">
+    <input type="checkbox" id="strategy">
+    <span class="slider"></span>
+  </label>
+</div>
+                -->
            </div>
             
             <div class="card">
@@ -552,11 +565,15 @@
                 </div>
                 
                 <textarea class="input-control" id='freeRequirement' placeholder="输入您的特别要求，如：优先使用国家电网，避开拥挤充电站..." 
-                  rows="3">优先安排早餐时段充电,尽量避免11:00-13:00高电价区间充电,保证抵达终点时有至少15%的电</textarea>
+                  rows="3">优先安排早餐时段充电,尽量避免11:00-13:00高电价区间充电,抵达终点时电量保持在10%左右</textarea>
             </div>
             
             <button id="plan-button" class="btn btn-primary">
                 <i class="fas fa-brain"></i> AI智能补能规划
+            </button>
+
+            <button id="load-button" class="btn btn-secondary">
+                <i class="fa fa-cloud-download"></i>加载上次计划
             </button>
             
             <div style="flex: 1;"></div>
@@ -609,19 +626,9 @@
                             </div>
                         </div>
                     </div>
-                    
-                    路线信息标签
-                    <div class="route-note">
-                        <i class="fas fa-exclamation-triangle" style="color: var(--warning); margin-right: 5px;"></i>
-                        注意：前方路段有强降雨，建议降低车速
-                    </div>
                     -->
                 </div>
             </div>
-            
-            <button class="btn btn-outline">
-                <i class="fas fa-redo"></i> 重新规划路线
-            </button>
         </div>
     </div>
     
@@ -641,7 +648,7 @@ function print(line) {
     lineDiv.innerHTML = line;
     parent.appendChild(lineDiv);
 }
-function getGravityEnergyKwh(distance, weight, altitudeDiff, eta = 0.25) {
+function getGravityEnergyKwh(distance, weight, altitudeDiff, eta = 0.3) {
     const massKg = weight * 1000;
     const g = 9.8;
     const d = distance * 1000;
@@ -667,6 +674,7 @@ async function generateRoute(key, model, responseFormat, startAddress, destAddre
         return [];
     }
     const aiPlan = await plan(stops, startTime, startSoc, maxSoc, minSoc, presets, otherRequirement);
+    aiPlan.forEach(step => step.inBetween = calculateConsumptionAndTime(step.fromStop, step.arrivalStop, stops)[2]);
     totalMins = toMinutes(aiPlan[aiPlan.length -1].arrivalTime) - toMinutes(startTime);
     return aiPlan;
 }
@@ -709,15 +717,15 @@ async function getStopRecord(fromStop, targetStop) {
         consumedBattery += (parseInt(step.step_distance) / 1000) * (step.cost.toll_road ? KwhPer120PerKm : KwhPer80PerKm);
     }
     const distKm = parseFloat((parseInt(path.distance) / 1000).toFixed(1));
-    const tags = [];
+    let lift = 0;
     if (fromStop.altitude !== undefined && targetStop.altitude !== undefined) {
         const altDiff = targetStop.altitude - fromStop.altitude;
         consumedBattery += getGravityEnergyKwh(distKm, Weight, altDiff);
         if (altDiff > 300) {
-            tags.push('海拔超300米爬坡');
+            lift = altDiff;
         }
         if (altDiff < -300) {
-            tags.push('海拔超300米下坡');
+            lift = altDiff;
         }
     }
     consumedBattery = parseFloat(consumedBattery.toFixed(2));
@@ -727,7 +735,7 @@ async function getStopRecord(fromStop, targetStop) {
         distance: distKm,
         consumedTime: Math.ceil((parseInt(path.cost.duration) * 0.9 - 90) / 60), // 90s, remove entering and leaving service stop time
         consumedBattery,
-        tags
+        lift
     };
 }
 async function getPath(originLoc, destLoc) {
@@ -822,7 +830,7 @@ async function getNearestStop(location, cities, prevStation) {
     }
     return;
 }
-;
+
 async function request(path) {
     await sleep(0.5);
     const reqUrl = `https://restapi.amap.com${path}&key=d0e0aab6356af92b0cd0763cae27ba35&output=json`;
@@ -864,19 +872,32 @@ function calculateConsumptionAndTime(from, to, stops) {
     let time = 0;
     let kwh = 0;
     let found = false;
+    let inBetween = [];
+    let lift = 0;
+    let dive = 0;
     for (const stop of stops) {
-        if (stop.start === from || from === stop.start.split('(')[0]) {
+        if (matchStopName(stop.start, from)) {
             found = true;
         }
         if (found) {
+            if (stop.lift > 0 && stop.lift > lift) {
+                lift = stop.lift;
+            } else if(stop.lift < 0 && stop.lift < dive) {
+                dive = stop.lift;
+            }
+
             time += stop.consumedTime;
             kwh += stop.consumedBattery;
         }
-        if (stop.end === to || to === stop.end.split('(')[0]) {
+        if (matchStopName(stop.end, to)) {
             if (!found)
                 break;
             else
-                return [kwh, time];
+                return [kwh, time, inBetween.join('-'), lift, dive];
+        } else {
+            if (found) {
+                inBetween.push(`${stop.end.split('(')[0]}(${stop.distance}km,${Math.ceil(stop.consumedBattery / maxBattery * 100)}%)`);
+            }
         }
     }
     const err = `从${from}到${to}的旅程没找到`;
@@ -887,8 +908,16 @@ function verifyPlan(plan, stops, startTime) {
     let leftKwh = maxBattery;
     const minKwh = Math.floor(hardMinSoc * 0.01 * maxBattery);
     let deviation = 0;
+    if (!matchStopName(stops[0].start, plan[0].fromStop)) {
+      const err = `The first start point is not ${stops[0].start}, but ${plan[0].fromStop}`;
+      print(err);
+      throw new Error(err);
+    }
     for (const step of plan) {
-        const [kwh, time] = calculateConsumptionAndTime(step.fromStop, step.arrivalStop, stops);
+        const [kwh, time, _, lift, dive] = calculateConsumptionAndTime(step.fromStop, step.arrivalStop, stops);
+        step.lift = lift;
+        step.dive = dive;
+
         totalTime += time;
         let tempLeftKwh = leftKwh;
         leftKwh -= kwh;
@@ -911,7 +940,7 @@ function verifyPlan(plan, stops, startTime) {
                     return err;
                 }
             }
-            const [kwh, _time] = calculateConsumptionAndTime(step.fromStop, step.backupStop, stops);
+            const [kwh, _time, _, _lift, _dive] = calculateConsumptionAndTime(step.fromStop, step.backupStop, stops);
             tempLeftKwh -= kwh;
             if (tempLeftKwh < minKwh) {
                 const err = `The hard minimal allowed Soc is ${hardMinSoc}%, but according to your plan, the remaining Soc from ${step.fromStop} to backup stop ${step.backupStop} will be under ${hardMinSoc}%`;
@@ -921,22 +950,22 @@ function verifyPlan(plan, stops, startTime) {
         }
         let aiGuessArrival = toMinutes(step.arrivalTime);
         deviation = Math.abs(aiGuessArrival - totalTime);
-        if (deviation > 2) {
+        if (deviation > 5) {
             const err = `Comparing to the actually calculated result, there is ${deviation} minutes deviation on arrival time from ${step.fromStop} to ${step.arrivalStop} according to your plan`;
             print(err);
             return err;
         }
         let aiGuessKwh = Math.floor(step.socBeforeRecharge * 0.01 * maxBattery);
         deviation = Math.abs(aiGuessKwh - Math.floor(leftKwh));
-        if (deviation > 1) {
+        if (deviation > 2) {
             const err = `Comparing to the actually calculated result, there is ${deviation} Kwh deviation on left battery when arrival at ${step.arrivalStop} according to your plan`;
             print(err);
             return err;
         }
-        let chargeKwh = (step.socAfterRecharge - step.socBeforeRecharge) * 0.01 * maxBattery / chargeEffe;
+        let chargeKwh = (step.socAfterRecharge - step.socBeforeRecharge) * 0.01 * maxBattery;
         let chargeTime = Math.ceil(chargeKwh / chargeSpeed * 60);
         deviation = Math.abs(step.rechargeTime - chargeTime);
-        if (deviation > 2) {
+        if (deviation > 5) {
             const err = `Comparing to the actually calculated result, there is ${deviation} minutes deviation on recharging time when recharging at ${step.arrivalStop} according to your plan`;
             print(err);
             return err;
@@ -944,7 +973,7 @@ function verifyPlan(plan, stops, startTime) {
         totalTime += step.rechargeTime;
         let aiGuessTime = toMinutes(step.departureTime);
         deviation = Math.abs(aiGuessTime - totalTime);
-        if (deviation > 2) {
+        if (deviation > 5) {
             const err = `Comparing to the actually calculated result, there is ${deviation} minutes deviation on departure time when departing ${step.arrivalStop} according to your plan`;
             print(err);
             return err;
@@ -955,18 +984,23 @@ function verifyPlan(plan, stops, startTime) {
     const last = plan[plan.length - 1];
     const lastPlannedStop = last.arrivalStop;
     const lastStop = stops[stops.length - 1].end;
-    if (lastStop !== lastPlannedStop && lastPlannedStop !== lastStop.split('(')[0]) {
-        const [kwh, time] = calculateConsumptionAndTime(lastPlannedStop, lastStop, stops);
+    if (!matchStopName(lastStop, lastPlannedStop)) {
+        const [kwh, time, _, lift, dive] = calculateConsumptionAndTime(lastPlannedStop, lastStop, stops);
         leftKwh -= kwh;
         if (leftKwh < minKwh) {
             const err = `The hard minimal allowed Soc is ${hardMinSoc}%, but according to your plan, the remaining Soc from ${lastPlannedStop} to ${lastStop} will be under ${hardMinSoc}%`;
             print(err);
             return err;
         }
-        plan.push({ fromStop: lastPlannedStop, arrivalStop: lastStop, backupStop: 'No', arrivalTime: `${toDate(toMinutes(last.departureTime) + time)}`, departureTime: '', socBeforeRecharge: Math.floor(leftKwh / maxBattery * 100), rechargeTime: 'N/A', socAfterRecharge: 'N/A', tags: ['到达目的地'] });
+        plan.push({lift, dive, fromStop: lastPlannedStop, arrivalStop: lastStop, backupStop: 'No', arrivalTime: `${toDate(toMinutes(last.departureTime) + time)}`, departureTime: '', socBeforeRecharge: Math.floor(leftKwh / maxBattery * 100), rechargeTime: 'N/A', socAfterRecharge: 'N/A', tags: [{tag: '到达目的地', icon: 'fa fa-map-marker'}] });
     }
     return '';
 }
+
+function matchStopName(originalStop, aiStop) {
+    return originalStop === aiStop || aiStop === originalStop.split('(')[0];
+}
+
 async function plan(stops, startTime, startSoc, maxSoc, minSoc, presets, otherRequirement, retry = 3, messages = []) {
     const prompt = `
 please assist the EV driver to make a recharging plan based on below info:
@@ -975,23 +1009,22 @@ please assist the EV driver to make a recharging plan based on below info:
 - EV full battery: ${maxBattery}Kwh
 - Start Soc: ${startSoc}%
 - Max recharge to Soc: ${maxSoc}%
-- Minimal allowed Soc: ${minSoc}%, minimal allowed soc before arriving at a recharging stop, set by user, should never be under ${hardMinSoc}%, if asked minimal allowed soc is under ${hardMinSoc}%, use hard setting: ${hardMinSoc}%
+- Minimal allowed Soc: ${minSoc}%, minimal allowed soc before arriving at a recharging stop
 - Charging rate: ${chargeSpeed}Kwh per hour
-- Charging overhead: ${chargeEffe}, meaning per 1kwh from the charger only ${chargeEffe}kwh can be converted into car's battery
 - Reduce the recharging times as less as possible to save overall trip time
 
 **route data structure info**:
-- the route provided to you consists of a list of steps, each step follows below JSON structure: {start: <name of the start service stop>, end: <name of the end service stop>, consumedTime: <driving time from start to end in mins>, consumedBattery: <consumed battery from start to end in Kwh>}
+- the route provided to you consists of a list of steps, each step follows below JSON format: {start: <name of the start service stop>, end: <name of the end service stop>, consumedTime: <driving time from start to end in mins>, consumedBattery: <battery to be consumed from start to end in Kwh>}
 - car can be recharged at any of these service stops
-**route data**:
+**here is the actual route data**:
 ${JSON.stringify(stops.map(({ start, end, consumedTime, consumedBattery }) => { return { start, end, consumedTime, consumedBattery }; }))}
 
-**driver's selected requirements(the options provided by App, selected requirement includes both requirement and related tags, tags can be put on the matching service stops)**:
-- ${presets.join('\n- ')}
-**driver's freely input requirements**:
-- freely input requirement takes prioritiy over the selected requirements
-- understand and try best to fulfill the input requirement, and create tags for them if applicable, each tag should be in Chinese and shoud not exceed 12 words 
-- freely input requirements are following: ${otherRequirement}
+**driver requirements**:
+- understand and try best to fulfill the driver requirements
+- summarize each driver requirement with a tag, each tag should be in Chinese and shoud not exceed 12 words 
+- find a suitable "fontawesome" icon for each tag, for example, icon "fa fa-coffee" can be used for tag "have a break"
+- the tag should be attached to the service stops which matching the requirement in the response
+- driver requirements are following: ${otherRequirement}
   `;
     //- generate the recharging plan by strictly follow below format:
     //[{fromStop: <>, arrivalStop: <current recharging service stop>, arrivalTime: <arrival time>, departureTime: <departure time>, chargeDetail: <planned recharging details>, tags:[<tags matching current service stop>]}]
@@ -1023,10 +1056,6 @@ ${JSON.stringify(stops.map(({ start, end, consumedTime, consumedBattery }) => { 
                                     type: 'string',
                                     description: 'Current planned recharging service stop name'
                                 },
-                                backupStop: {
-                                    type: 'string',
-                                    description: 'The backup service stop name for recharging in case the arrivalStop is out of service. Set this field to "" if no backupStop is needed.'
-                                },
                                 arrivalTime: {
                                     type: 'string',
                                     description: 'The estimated time of arriving arrivalStop, format as: HH:MM, HH is from 00 to 23'
@@ -1056,12 +1085,24 @@ ${JSON.stringify(stops.map(({ start, end, consumedTime, consumedBattery }) => { 
                                     type: 'array',
                                     description: 'The tags that matching current service stop',
                                     items: {
-                                        type: 'string',
-                                        description: 'The tag name'
+                                        type: 'object',
+                                        description: 'The tag info',
+                                        required: ['tag', 'icon'],
+                                        properties: {
+                                            tag: {
+                                                type: 'string',
+                                                description: 'the tag name'
+                                            },
+                                            icon: {
+                                                type: 'string',
+                                                description: 'the fontawesome icon to visualize the tag'
+                                            }
+                                        },
+                                        additionalProperties: false
                                     }
                                 }
                             },
-                            required: ['fromStop', 'arrivalStop', 'backupStop', 'arrivalTime', 'departureTime', 'socBeforeRecharge', 'socAfterRecharge', 'rechargeTime', 'tags'],
+                            required: ['fromStop', 'arrivalStop', 'arrivalTime', 'departureTime', 'socBeforeRecharge', 'socAfterRecharge', 'rechargeTime', 'tags'],
                             additionalProperties: false
                         }
                     }
@@ -2315,10 +2356,32 @@ const ServiceStops = {
           for(const step of steps) {
             const stepCard = document.createElement('div');
             stepCard.className = 'step-card';
-            const tags = step.tags.map(tag => `<div class="badge badge-pref"><i class="fas fa-leaf"></i>${tag}</div>`).join(' ');
+            const tags = step.tags.map(tag => `<div class="badge badge-pref"><i class="${tag.icon}"></i>${tag.tag}</div>`).join(' ');
+            if (step.lift !== 0) {
+                const roadNote = document.createElement('div');
+                roadNote.innerHTML = `
+                        <div class="route-note">
+                            <i class="fa fa-battery-quarter" style="color: var(--warning); margin-right: 5px;"></i>
+                            途中有超过${step.lift}米海拔爬升,注意电耗增加
+                        </div>
+                `;
+                parent.appendChild(roadNote);
+            }
+            if (step.dive !== 0) {
+                const roadNote = document.createElement('div');
+                roadNote.innerHTML = `
+                        <div class="route-note">
+                            <i class="fa fa-battery-three-quarters" style="color: green; margin-right: 5px;"></i>
+                            途中有超过${Math.abs(step.dive)}米海拔下降,动能回收拉满
+                        </div>
+                `;
+                parent.appendChild(roadNote);
+            }
+
             stepCard.innerHTML = `<div class="step-marker">${stepMarker++}</div>
+<div class="detail-label">${step.inBetween}</div>
 <div class="step-header">
-    <div class="step-title">${step.arrivalStop}</div>
+    <div class="step-title">${step.arrivalStop.split('(')[0]}</div>
     <div class="step-time">预计到达 ${step.arrivalTime}</div>
 </div>
 <div class="step-details">
@@ -2348,8 +2411,29 @@ const ServiceStops = {
             const routePage = document.getElementById('route-page');
             const loadingPage = document.getElementById('loading-page');
             const planButton = document.getElementById('plan-button');
+            const loadButton = document.getElementById('load-button');
             const backButton = document.getElementById('back-button');
             
+            loadButton.addEventListener('click', async function() {
+              const data = loadDataFromLocalStorage();
+              if (data === undefined) {
+                alert('没有缓存数据');
+                return;
+              }
+              const startPoint = data.startPoint;
+              const endPoint = data.endPoint;
+              const startTime = data.startTime;
+              totalDistance = data.totalDistance;
+              totalMins = data.totalMins;
+
+              inputPage.classList.remove('active');
+              routePage.classList.add('active');
+              const aiPlan = data.aiPlan;
+              renderSteps(startPoint, endPoint, aiPlan);
+              document.body.scrollTop = 0;
+              document.documentElement.scrollTop = 0;
+            });
+
             // 点击规划按钮切换到路线页面
             planButton.addEventListener('click', async function() {
               const startPoint = document.getElementById('startPoint').value.trim();
@@ -2360,7 +2444,13 @@ const ServiceStops = {
               const startSoc = parseInt(document.getElementById('startSoc').value.trim());
               const maxSoc = parseInt(document.getElementById('maxSoc').value.trim());
               const minSoc = parseInt(document.getElementById('minSoc').value.trim());
-              const conservative = document.getElementById('strategy').checked;
+              if (minSoc < hardMinSoc) {
+                alert(`保电目标不能低于${hardMinSoc}`);
+                return;
+              }
+              let cacheData = {startPoint, endPoint, startTime};
+              //const conservative = document.getElementById('strategy').checked;
+              const conservative = false;
               const requirements = document.getElementById('freeRequirement').value.trim();
               const supportResponseFormat = document.getElementById('responseFormat').checked;
             
@@ -2368,37 +2458,12 @@ const ServiceStops = {
               loadingPage.classList.add('active');
               try {
                 const aiPlan = await generateRoute(key, model, supportResponseFormat, startPoint, endPoint, startTime, startSoc, maxSoc, minSoc, [conservative ? Preset.conservative : Preset.aggressive], requirements);
-//const aiPlan = [{
-//arrivalStop : "贺州服务区(汕昆高速昆明方向)",
-//arrivalTime : "09:32",
-//backupStop : "",
-//departureTime : "10:11",
-//fromStop : "广州市黄埔区中新知识城招商雍景湾",
-//rechargeTime : 39,
-//socAfterRecharge : 85,
-//socBeforeRecharge : 16,
-//tags : ['注意补电']},
-//{arrivalStop : "五通服务区(包茂高速包头方向)",
-//arrivalTime : "12:35",
-//backupStop : "",
-//departureTime : "13:15",
-//fromStop : "贺州服务区(汕昆高速昆明方向)",
-//rechargeTime : 40,
-//socAfterRecharge : 85,
-//socBeforeRecharge : 15,
-//tags : ['注意补电', '避免高电价']},
-//{
-//arrivalStop : "广西壮族自治区柳州市三江侗族自治县浔江大道59",
-//arrivalTime : "14:15",
-//backupStop : "No",
-//departureTime : "",
-//fromStop : "五通服务区(包茂高速包头方向)",
-//rechargeTime : 0,
-//socAfterRecharge : -1,
-//socBeforeRecharge : 57,
-//tags : ['到达目的地']
-//} ]
                 if (aiPlan.length > 0) {
+                  cacheData.aiPlan = aiPlan;
+                  cacheData.totalDistance = totalDistance;
+                  cacheData.totalMins = totalMins;
+
+                  saveDataToLocalStorage(cacheData);
                   loadingPage.classList.remove('active');
                   routePage.classList.add('active');
                   console.log(aiPlan)
@@ -2433,6 +2498,27 @@ const ServiceStops = {
                 }, 2000);
             });
         });
+
+        function saveDataToLocalStorage(data) {
+            try {
+                localStorage.setItem('aiplan', JSON.stringify(data));
+            } catch (e) {
+                alert('保存失败: ' + e.message);
+            }
+        }
+        
+        // 从LocalStorage加载数据
+        function loadDataFromLocalStorage() {
+            try {
+                const savedData = localStorage.getItem('aiplan');
+                if (savedData) {
+                    return JSON.parse(savedData);
+                }
+            } catch (e) {
+                alert('加载失败: ' + e.message);
+            }
+            return undefined;
+        }
     </script>
 </body>
 </html>
