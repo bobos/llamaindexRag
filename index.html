@@ -721,7 +721,7 @@ async function getStopRecord(fromStop, targetStop) {
     if (fromStop.altitude !== undefined && targetStop.altitude !== undefined) {
         const altDiff = targetStop.altitude - fromStop.altitude;
         consumedBattery += getGravityEnergyKwh(distKm, Weight, altDiff);
-        if (altDiff > 300) {
+        if (altDiff > 250) {
             lift = altDiff;
         }
         if (altDiff < -300) {
