@@ -963,7 +963,7 @@ function verifyPlan(plan, stops, startTime) {
             print(err);
             return err;
         }
-        plan.push({ fromStop: lastPlannedStop, arrivalStop: lastStop, backupStop: 'No', arrivalTime: `${toDate(toMinutes(last.departureTime) + time)}`, departureTime: '', socBeforeRecharge: Math.floor(leftKwh / maxBattery * 100), rechargeTime: 0, socAfterRecharge: -1, tags: ['到达目的地'] });
+        plan.push({ fromStop: lastPlannedStop, arrivalStop: lastStop, backupStop: 'No', arrivalTime: `${toDate(toMinutes(last.departureTime) + time)}`, departureTime: '', socBeforeRecharge: Math.floor(leftKwh / maxBattery * 100), rechargeTime: 'N/A', socAfterRecharge: 'N/A', tags: ['到达目的地'] });
     }
     return '';
 }
@@ -2300,7 +2300,7 @@ const ServiceStops = {
                     </div>
                     <div class="step-details">
                         <div class="detail-item">
-                            <div class="detail-value">${totalDistance} km</div>
+                            <div class="detail-value">${totalDistance.toFixed()} km</div>
                             <div class="detail-label">总里程</div>
                         </div>
                         <div class="detail-item">
