@@ -1114,9 +1114,30 @@ ${JSON.stringify(stops.map(({ start, end, consumedTime, consumedBattery }) => { 
             }
         }
     };
-    const promptForDsR1 = prompt + `\n**output requirement**:
-  generate output which strictly follows below JSON schema:
-  ${JSON.stringify(response_format)}`;
+    const promptForDsR1 = prompt + `\n**output the plan in JSON format, if no plan can be made, provide the reason in "reason" field.
+EXAMPLE JSON OUTPUT:
+{
+  "reason": "",
+  "rechargingPlan": [
+    "fromStop": "service stop A",
+    "arrivalStop": "arrived service stop B",
+    "arrivalTime": "14:00",
+    "departureTime": "14:30",
+    "socBeforeRecharge": 20,
+    "socAfterRecharge": 85,
+    "rechargeTime": 35,
+    "tags": [{"tag": "having lunch at this service stop", "icon": "fa fa-coffee"}]
+  ] 
+}
+JSON field explanation:
+fromStop: Journey start point or previous recharging service stop name.
+arrivalStop: Current planned recharging service stop name.
+arrivalTime: The estimated time of arriving arrivalStop, format as: HH:MM, HH is from 00 to 23.
+departureTime: The estimated time of departing arrivalStop, format as: HH:MM, HH is from 00 to 23.
+socBeforeRecharge: The percentage of soc before recharging,  from 1 to 99, means 1% - 99%.
+socAfterRecharge: The percentage of soc after recharging,  from 2 to 100, means 2% - 100%.
+rechargeTime: Estimated time to complete recharging in minutes.
+tags: The tags that matching current service stop`;
     if (messages.length === 0) {
         messages = [
             {
@@ -1129,7 +1150,7 @@ ${JSON.stringify(stops.map(({ start, end, consumedTime, consumedBattery }) => { 
             }
         ];
     }
-    let answer = await askLlm(openrouterHost, apiKey, chatModel, messages, response_format);
+    let answer = await askLlm(openrouterHost, apiKey, chatModel, messages, supportResponseFormat ? response_format : {type: 'json_object'});
     if (answer.startsWith('```json')) {
         const regex = /```json\s([\s\S]*?)```/s;
         const body = answer.match(regex);
@@ -1173,7 +1194,7 @@ async function askLlm(host, key, model, messages, response_format) {
             enabled: true
         }
     };
-    if (response_format !== undefined && supportResponseFormat) {
+    if (response_format !== undefined) {
         body.response_format = response_format;
     }
     let response = await fetch(host, {
