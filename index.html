@@ -547,7 +547,11 @@
                     <label class="input-label">充电目标</label>
                     <input type="text" class="input-control" id="maxSoc" value="85">
                 </div>
-                
+              
+                <div class="input-group">
+                    <label class="input-label">路线</label>
+                    <input type="text" class="input-control" id="routeNo" value="1">
+                </div>  
                 <!--
 <div class="switch-container">
   <h4>保守策略</h4>
@@ -634,6 +638,7 @@
     
     <script>
 "use strict";
+        let routeNo=0;
 const KwhPer120PerKm = 17 * 0.01; //65%
 const KwhPer80PerKm = 14 * 0.01; //80%
 const Weight = 2.1;
@@ -746,7 +751,7 @@ async function getPath(originLoc, destLoc, first) {
         throw new Error(`failed to path from ${originLoc} to ${destLoc}`);
     }
     let path = response.route.paths[0];
-    if(first) return path;
+    if(first) return response.route.paths[routeNo];
     let duration = parseInt(path.cost.duration);
     for (const p of response.route.paths) {
         let d = parseInt(p.cost.duration);
@@ -2552,6 +2557,7 @@ const ServiceStops = {
 
             // 点击规划按钮切换到路线页面
             planButton.addEventListener('click', async function() {
+                const routeNo = document.GetElementById('routeNo').value.trim();
               const startPoint = document.getElementById('startPoint').value.trim();
               const endPoint = document.getElementById('stopPoint').value.trim();
               const model = document.getElementById('model').value.trim();
