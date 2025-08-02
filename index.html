@@ -698,7 +698,7 @@ async function collectStops(startStation, endStation) {
                 totalDistance += nextStop.distance;
                 nextStop.distanceTillNow = totalDistance.toFixed();
                 prevStation = ret;
-                print(`${nextStop.end} ${totalDistance.toFixed()}公里`);
+                print(`${nextStop.end} ${(totalConsumption/maxBattery * 100).toFixed()}% ${totalDistance.toFixed()}公里`);
             }
         }
     }
