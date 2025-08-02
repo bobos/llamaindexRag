@@ -485,7 +485,7 @@
         <div class="container">
             <div class="page-header">
                 <div class="page-title">
-                    <i class="fas fa-bolt"></i> 补能规划v1.0
+                    <i class="fas fa-bolt"></i> 补能规划v1.1
                 </div>
             </div>
             
@@ -2557,7 +2557,7 @@ const ServiceStops = {
 
             // 点击规划按钮切换到路线页面
             planButton.addEventListener('click', async function() {
-                const routeNo = document.GetElementById('routeNo').value.trim();
+              routeNo = document.getElementById('routeNo').value.trim();
               const startPoint = document.getElementById('startPoint').value.trim();
               const endPoint = document.getElementById('stopPoint').value.trim();
               const model = document.getElementById('model').value.trim();
