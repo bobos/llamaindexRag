@@ -634,11 +634,11 @@
     
     <script>
 "use strict";
-const KwhPer120PerKm = 17.2 * 0.01; //65%
+const KwhPer120PerKm = 17 * 0.01; //65%
 const KwhPer80PerKm = 14 * 0.01; //80%
 const Weight = 2.1;
 const chargeEffe = 0.92;
-const chargeSpeed = 70;
+const chargeSpeed = 65;
 const J2KwhFactor = 3.6e6;
 const maxBattery = 61;
 const hardMinSoc = 5;
@@ -735,7 +735,7 @@ async function getStopRecord(fromStop, targetStop) {
         start: fromStop.name,
         end: targetStop.name,
         distance: distKm,
-        consumedTime: Math.ceil((parseInt(path.cost.duration) * 0.9 - 90) / 60), // 90s, remove entering and leaving service stop time
+        consumedTime: Math.ceil((parseInt(path.cost.duration) * 0.95 - 90) / 60), // 90s, remove entering and leaving service stop time
         consumedBattery,
         lift
     };
