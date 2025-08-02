@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>电车出行补能规划</title>
+    <title>电车出行补能规划v1.0.0</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -682,7 +682,7 @@ async function collectStops(startStation, endStation) {
     const stops = [];
     let prevStation = startStation;
     let totalConsumption = 0;
-    const path = await getPath(startStation.location, endStation.location);
+    const path = await getPath(startStation.location, endStation.location, true);
     for (const step of path.steps) {
         const distance = parseInt(step.step_distance);
         if (!step.cost.toll_road || distance < 500)
@@ -740,12 +740,13 @@ async function getStopRecord(fromStop, targetStop) {
         lift
     };
 }
-async function getPath(originLoc, destLoc) {
+async function getPath(originLoc, destLoc, first) {
     const response = await request(`/v5/direction/driving?origin=${originLoc}&destination=${destLoc}&strategy=32&cartype=1&show_fields=cost,polyline,cities`);
     if (!response) {
         throw new Error(`failed to path from ${originLoc} to ${destLoc}`);
     }
     let path = response.route.paths[0];
+    if(first) return path;
     let duration = parseInt(path.cost.duration);
     for (const p of response.route.paths) {
         let d = parseInt(p.cost.duration);
