@@ -654,14 +654,14 @@ function print(line) {
     lineDiv.innerHTML = line;
     parent.appendChild(lineDiv);
 }
-function getGravityEnergyKwh(distance, weight, altitudeDiff, eta = 0.25) {
+function getGravityEnergyKwh(distance, weight, altitudeDiff, eta = 0.3) {
     const massKg = weight * 1000;
     const g = 9.8;
     const d = distance * 1000;
     const slope = altitudeDiff / d;
     const slopeRad = Math.atan(slope);
     const slopeForce = massKg * g * Math.sin(slopeRad);
-    const slopeEnergy = 1.6 * (slopeForce * d) / J2KwhFactor; // 1.2为精准系数，考虑到路途中起伏难测，加到1.6
+    const slopeEnergy = 1.35 * (slopeForce * d) / J2KwhFactor; // 1.2为精准系数，考虑到路途中起伏难测，加到1.35
     return altitudeDiff >= 0 ? slopeEnergy : slopeEnergy * eta;
 }
 let chatModel = '';
