@@ -647,6 +647,7 @@ const chargeSpeed = 65;
 const J2KwhFactor = 3.6e6;
 const maxBattery = 61;
 const hardMinSoc = 5;
+        let socStart = 100;
 function print(line) {
     const parent = document.getElementById('loading-page');
     const lineDiv = document.createElement('div');
@@ -913,7 +914,7 @@ function calculateConsumptionAndTime(from, to, stops) {
 }
 function verifyPlan(plan, stops, startTime) {
     let totalTime = toMinutes(startTime);
-    let leftKwh = maxBattery;
+    let leftKwh = maxBattery * socStart * 0.01;
     const minKwh = Math.floor(hardMinSoc * 0.01 * maxBattery);
     let deviation = 0;
     if (!matchStopName(stops[0].start, plan[0].fromStop)) {
@@ -2564,6 +2565,7 @@ const ServiceStops = {
               const key = document.getElementById('apikey').value.trim();
               const startTime = document.getElementById('startTime').value.trim();
               const startSoc = parseInt(document.getElementById('startSoc').value.trim());
+                socStart = startSoc;
               const maxSoc = parseInt(document.getElementById('maxSoc').value.trim());
               const minSoc = parseInt(document.getElementById('minSoc').value.trim());
               if (minSoc < hardMinSoc) {
