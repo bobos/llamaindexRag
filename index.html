@@ -485,7 +485,7 @@
         <div class="container">
             <div class="page-header">
                 <div class="page-title">
-                    <i class="fas fa-bolt"></i> 补能规划v1.2
+                    <i class="fas fa-bolt"></i> 补能规划v1.3
                 </div>
             </div>
             
@@ -1212,7 +1212,7 @@ async function askLlm(host, key, model, messages, response_format) {
         },
         body: JSON.stringify(body)
     });
-    print(response);
+    print(JSON.stringify(response));
     response = (await response.json()).choices[0].message;
     if (response.tool_calls) {
         if (callCnt > 20) {
