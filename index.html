@@ -485,7 +485,7 @@
         <div class="container">
             <div class="page-header">
                 <div class="page-title">
-                    <i class="fas fa-bolt"></i> 补能规划v1.8
+                    <i class="fas fa-bolt"></i> 补能规划v1.9
                 </div>
             </div>
             
@@ -654,7 +654,7 @@ function print(line) {
     lineDiv.innerHTML = line;
     parent.appendChild(lineDiv);
 }
-function getGravityEnergyKwh(distance, weight, altitudeDiff, eta = 0.55) {
+function getGravityEnergyKwh(distance, weight, altitudeDiff, eta = 0.6) {
     const massKg = weight * 1000;
     const g = 9.8;
     const d = distance * 1000;
